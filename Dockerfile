@@ -23,6 +23,5 @@ USER node
 # OPTIMISATION : On bride la heap à 180Mo pour tenir dans un limit K8s de 256Mo
 ENV NODE_OPTIONS="--max-old-space-size=180"
 
-#change port
-EXPOSE 4000
+EXPOSE 4008
 CMD ["node", "dist/index.js"]

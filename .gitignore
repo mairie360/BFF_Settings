@@ -7,3 +7,5 @@ dist/
 coverage/
 src/services/generated/
 openapi.json
+
+!contracts/openapi.json
