@@ -6,14 +6,12 @@
     "build": "tsc",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
-    "openapi:generate": "openapi-typescript-codegen --input ./openapi.yaml --output ./src/services/generated --client axios",
     "test": "jest",
     "openapi:extract": "ts-node scripts/export-swagger.ts",
     "contracts:generate": "npm run openapi:extract && node scripts/contracts.mjs --generate",
     "contracts:check": "npm run openapi:extract -- --check && node scripts/contracts.mjs --check"
   },
   "dependencies": {
-    "axios": "1.12.2",
     "dotenv": "17.2.3",
     "express": "5.1.0",
     "@asteasolutions/zod-to-openapi": "8.5.0",
@@ -28,7 +26,6 @@
     "@typescript-eslint/parser": "8.45.0",
     "eslint": "9.37.0",
     "jest": "30.2.0",
-    "openapi-typescript-codegen": "0.29.0",
     "supertest": "7.1.4",
     "ts-jest": "29.4.4",
     "ts-node": "10.9.2",
