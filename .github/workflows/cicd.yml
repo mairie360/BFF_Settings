@@ -1,17 +1,19 @@
-# name: BFF Template CICD #change bff name
+name: BFF Settings CICD
 
-# on:
-#   push:
-#   workflow_dispatch:
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
 
-# permissions:
-#   contents: write
-#   packages: write
+permissions:
+  contents: write
+  packages: write
 
-# jobs:
-#   CICD:
-#     uses: mairie360/CICD/.github/workflows/BFFs-cicd.yml@main
-#     with:
-#       package_name: bff-{} #change bff name
-#       node_version: 20
-#     secrets: inherit
+jobs:
+  CICD:
+    uses: mairie360/CICD/.github/workflows/BFFs-cicd.yml@v1.14.0
+    with:
+      package_name: bff-settings
+      node_version: "22"
+      cicd_version: v1.14.0
+    secrets: inherit
