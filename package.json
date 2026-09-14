@@ -14,7 +14,7 @@
   "dependencies": {
     "dotenv": "17.2.3",
     "express": "5.1.0",
-    "@asteasolutions/zod-to-openapi": "8.5.0",
+    "@asteasolutions/zod-to-openapi": "9.1.0",
     "zod": "4.5.4",
     "swagger-ui-express": "5.0.1"
   },
