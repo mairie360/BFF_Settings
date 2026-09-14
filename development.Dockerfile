@@ -1,5 +1,15 @@
+# Étape 1 : build
+FROM node:24-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
 FROM node:24-alpine
 
+# Étape 2 : run
+FROM node:24-alpine
+# AJOUT DE CURL ICI (Alpine utilise apk)
 # Installation de curl pour le healthcheck Docker
 RUN apk add --no-cache curl
 
