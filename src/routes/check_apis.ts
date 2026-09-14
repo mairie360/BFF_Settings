@@ -1,9 +1,14 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { registry } from '../openapi-registry';
 import { baseUrl } from '../clients/upstream';
 
 const router = Router();
-registry.registerPath({ method: 'get', path: '/check_apis', responses: { 200: { description: 'Services disponibles' }, 502: { description: 'Service indisponible' } } });
+const CheckApisSchema = z.object({ status: z.string() }).catchall(z.string());
+registry.registerPath({ method: 'get', path: '/check_apis', responses: {
+  200: { description: 'Services disponibles', content: { 'application/json': { schema: CheckApisSchema } } },
+  502: { description: 'Service indisponible', content: { 'application/json': { schema: CheckApisSchema } } },
+} });
 router.get('/', async (_req, res) => {
   const services = ["CORE_API"];
   const results = await Promise.allSettled(services.map(async (service) => {

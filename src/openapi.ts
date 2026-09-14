@@ -8,5 +8,6 @@ import './routes/settings';
 // Runtime documentation and exported clients use the same mounted routes.
 export const openApiDocument = new OpenApiGeneratorV31(registry.definitions).generateDocument({
   openapi: '3.1.0',
-  info: { title: 'BFF Settings API', version: '1.0.0' },
+  // Snake_case like the Rust APIs: orval derives endpoints/bffSettings.ts + getBffSettings() from it.
+  info: { title: 'bff_settings', version: '1.0.0' },
 });

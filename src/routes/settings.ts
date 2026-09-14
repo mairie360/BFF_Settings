@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { registry } from '../openapi-registry';
+import { registry, ErrorSchema } from '../openapi-registry';
 import { authorization, forward, json, routeError } from '../clients/upstream';
+
+const errorContent = { content: { 'application/json': { schema: ErrorSchema } } };
+const passthroughContent = { content: { 'application/json': { schema: z.record(z.string(), z.unknown()) } } };
 
 const router = Router();
 router.use((req, res, next) => {
@@ -20,7 +23,7 @@ export const BootstrapSchema = registry.register('SettingsBootstrap', z.object({
 }));
 registry.registerPath({ method: 'get', path: '/settings/bootstrap', responses: {
   200: { description: 'Profil et sessions Core de l’utilisateur connecté', content: { 'application/json': { schema: BootstrapSchema } } },
-  401: { description: 'Session invalide' }, 502: { description: 'Profil indisponible' },
+  401: { description: 'Session invalide', ...errorContent }, 502: { description: 'Profil indisponible', ...errorContent },
 } });
 router.get('/bootstrap', async (req, res) => {
   try {
@@ -37,7 +40,7 @@ router.get('/bootstrap', async (req, res) => {
 });
 registry.registerPath({ method: 'patch', path: '/settings/profile', request: {
   body: { required: true, content: { 'application/json': { schema: ProfilePatchSchema } } },
-}, responses: { 200: { description: 'Profil sauvegardé puis relu', content: { 'application/json': { schema: ProfileSchema } } }, 400: { description: 'Champs invalides ou non pris en charge' } } });
+}, responses: { 200: { description: 'Profil sauvegardé puis relu', content: { 'application/json': { schema: ProfileSchema } } }, 400: { description: 'Champs invalides ou non pris en charge', ...errorContent } } });
 router.patch('/profile', async (req, res) => {
   const body = ProfilePatchSchema.safeParse(req.body);
   if (!body.success || !Object.keys(body.data).length) return res.status(400).json({ error: { message: 'Les champs autorisés sont prénom, nom, e-mail et téléphone.' } });
@@ -56,7 +59,11 @@ const preferences = [
 for (const [section, target] of preferences) {
   registry.registerPath({ method: 'patch', path: `/settings/${section}`, request: {
     body: { required: true, content: { 'application/json': { schema: z.record(z.string(), z.unknown()) } } },
-  }, responses: { 200: { description: 'Préférences enregistrées par Core' }, 404: { description: 'Fonction non disponible dans Core' } } });
+  }, responses: {
+    200: { description: 'Préférences enregistrées par Core', ...passthroughContent },
+    400: { description: 'Corps de requête invalide', ...errorContent },
+    404: { description: 'Fonction non disponible dans Core', ...passthroughContent },
+  } });
   router.patch(`/${section}`, (req, res) => forward(req, res, 'CORE_API', target));
 }
 export default router;
