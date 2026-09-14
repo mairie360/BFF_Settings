@@ -25,7 +25,7 @@ x-db-env: &db-env
 
 services:
   postgres:
-    image: ${DB_IMAGE:-ghcr.io/mairie360/database:dev-a50c7b2}
+    image: ${DB_IMAGE:-ghcr.io/mairie360/database:1.0.0}
     container_name: bff-settings-sec-db
     environment:
       POSTGRES_USER: postgres
@@ -44,7 +44,7 @@ services:
       retries: 10
 
   liquibase:
-    image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:dev-a50c7b2}
+    image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:1.0.0}
     container_name: bff-settings-sec-liquibase
     depends_on:
       postgres:
@@ -91,7 +91,7 @@ services:
       retries: 5
 
   core:
-    image: ${CORE_API_IMAGE:-ghcr.io/mairie360/core-api:dev-4048375}
+    image: ${CORE_API_IMAGE:-ghcr.io/mairie360/core-api:1.1.1}
     container_name: bff-settings-sec-core-api
     depends_on:
       seeder:
@@ -125,6 +125,32 @@ services:
     networks:
       - backend
 
+  bff-user:
+    image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:0.3.0}
+    container_name: bff-settings-sec-bff-user
+    depends_on:
+      seeder:
+        condition: service_completed_successfully
+      core-ready:
+        condition: service_completed_successfully
+    environment:
+      <<: *db-env
+      HOST: "0.0.0.0"
+      PORT: 4000
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: 'b"secret"'
+      CORE_API_URL: http://core:3000
+    expose:
+      - "4000"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
   bff-settings:
     image: ${TARGET_IMAGE:-bff-settings:security}
     container_name: bff-settings-sec-bff
@@ -153,6 +179,8 @@ services:
     container_name: bff-settings-sec-zap
     depends_on:
       bff-settings:
+        condition: service_healthy
+      bff-user:
         condition: service_healthy
     volumes:
       - ./.zap/rules.tsv:/zap/wrk/rules.tsv:ro
