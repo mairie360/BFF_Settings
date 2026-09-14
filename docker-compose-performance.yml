@@ -14,6 +14,12 @@ volumes:
 networks:
   backend:
 
+secrets:
+  npmrc:
+    file: ./.npmrc
+  node_auth_token:
+    environment: NODE_AUTH_TOKEN
+
 x-db-env: &db-env
   DB_TYPE: postgres
   DB_NAME: mairie_360_database
@@ -24,7 +30,7 @@ x-db-env: &db-env
 
 services:
   postgres:
-    image: ${DB_IMAGE:-ghcr.io/mairie360/database:1.0.0}
+    image: ${DB_IMAGE:-ghcr.io/mairie360/database:1.1.0}
     container_name: bff-settings-perf-db
     environment:
       POSTGRES_USER: postgres
@@ -43,7 +49,7 @@ services:
       retries: 10
 
   liquibase:
-    image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:1.0.0}
+    image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:1.1.0}
     container_name: bff-settings-perf-liquibase
     depends_on:
       postgres:
@@ -125,7 +131,7 @@ services:
       - backend
 
   bff-user:
-    image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:0.3.0}
+    image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:0.4.0}
     container_name: bff-settings-perf-bff-user
     depends_on:
       seeder:
@@ -156,6 +162,9 @@ services:
     build:
       context: .
       dockerfile: development.Dockerfile
+      secrets:
+        - npmrc
+        - node_auth_token
     depends_on:
       core-ready:
         condition: service_completed_successfully
