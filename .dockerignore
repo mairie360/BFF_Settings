@@ -1,0 +1,22 @@
+.git
+.gitignore
+.github
+.idea
+.vscode
+
+node_modules
+dist
+coverage
+*.log
+
+.env
+.env.*
+!.env.example
+.npmrc
+
+# Stacks de test isolées (non nécessaires à l'image)
+.zap
+load-test.js
+init-test.sql
+docker-compose*.yml
+*_test.sh

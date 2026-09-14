@@ -6,7 +6,10 @@ dist/
 .vscode/
 coverage/
 src/services/generated/
+
 openapi.json
+openapi.yaml
+.npmrc
 
 # Rapports générés par les tests de sécurité / performance
 .zap/*.html
