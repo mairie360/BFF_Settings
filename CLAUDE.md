@@ -12,7 +12,7 @@ the web service consumes. It holds no database and no local state.
 ## Commands
 
 ```bash
-npm ci                      # install (use Node.js 22 to match the contract CI job)
+npm ci                      # install (Node.js 24 in contracts CI and Docker images)
 npm run start               # ts-node src/index.ts, listens on PORT (default 4008)
 npm run build               # tsc -> dist/
 npm run lint                # eslint (flat config: eslint.config.cjs)
@@ -94,20 +94,24 @@ scan will surface it — fix or triage rather than blanket-ignoring.
 
 ## Gotchas
 
-- **Two ESLint configs.** `eslint.config.cjs` (flat) is the active one for ESLint 9. `.eslintrc.js` is
-  legacy and unused — don't edit it expecting an effect.
-- **Node version split.** Contract CI and local dev target Node 22; the Dockerfiles use `node:20-alpine`.
+- **ESLint** uses only the flat `eslint.config.cjs` (the legacy `.eslintrc.js` was removed, like in the
+  sibling BFFs).
+- **Node version split.** `contracts.yml` and the Dockerfiles (`node:24-alpine`) use Node 24, while the
+  shared `cicd.yml` still passes `node_version: "22"` (same as every sibling BFF).
+- Dockerfiles read GitHub Packages credentials through BuildKit secrets (`npmrc`, `node_auth_token`)
+  only during `npm ci`; the test compose files declare both secrets.
 - `contracts:sync` is referenced in the docs/CONTRACT.md but `scripts/contracts.mjs` has `source = null`,
   so the sync branch is an inert stub — syncing to web-service repos is not wired up here.
 - `src/views/check_api_view.ts` defines `CheckApiResponseSchema` but the `check_apis` route builds its
   response object ad hoc; the schema is not what's served.
 - `.npmrc` points `@mairie360:*` at GitHub Packages and needs `NODE_AUTH_TOKEN`, even though there are
   currently no `@mairie360/*` dependencies.
-- `cicd.yml` calls the shared `mairie360/CICD` `BFFs-cicd.yml@v1.13.2`. That workflow's `security_tests`
-  / `performance_tests` jobs still `docker compose -f docker-compose.test.yml ...` (a single file with
-  both `security-scan` and `k6-perf-test` services) — it has **not** been migrated to the split-file +
-  `*_test.sh` pattern that `APIs_cicd.yml` already uses, so the local stacks here are not invoked by CI
-  until the shared workflow is updated and its version bumped.
+- `cicd.yml` calls the shared `mairie360/CICD` `BFFs-cicd.yml@v2.3.0` (with `openapi_spec_path` and
+  explicit `CODECOV_TOKEN` / `N8N_WEBHOOK_SECRET` secrets); Renovate keeps `cicd_version` aligned with
+  the tag, and `.releaserc.json` drives semantic-release.
+- The test stacks pin `database` / `liquibase-migrations` 1.1.0, `core-api` 1.1.1 and `bff-user` 0.4.0.
+  Core API ≥ 1.1.1 panics on `/user/me` for users without a role, so `init-test.sql` gives user 2 the
+  `User` role.
 - Tests mock `globalThis.fetch`; `tests/contracts.test.ts` requires `contracts/openapi.json` to exist.
 
 ## Docs

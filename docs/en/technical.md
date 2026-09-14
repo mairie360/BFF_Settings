@@ -89,11 +89,11 @@ The type generator is pinned to `openapi-typescript@7.10.1` in `scripts/contract
 
 ## CI/CD and Docker execution
 
-The `contracts.yml` job uses Node.js 22, `actions/checkout@v7` and `actions/setup-node@v7`. It runs on pushes, pull requests and manual dispatch; it installs with `npm ci`, checks contracts and runs the associated tests.
+The `contracts.yml` job uses Node.js 24, `actions/checkout@v7` and `actions/setup-node@v7`. It runs on pushes, pull requests and manual dispatch; it installs with `npm ci`, checks contracts and runs the associated tests.
 
-The `cicd.yml` file is an entirely commented template: it does not run the shared pipeline. The contract workflow is active. The presence of the template does not imply automatic deployment.
+The `cicd.yml` file calls the shared `mairie360/CICD` `BFFs-cicd.yml@v2.3.0` workflow (`node_version: "22"`, `openapi_spec_path: contracts/openapi.json`). Releases are handled by semantic-release (`.releaserc.json`).
 
-The Dockerfile currently uses `node:20-alpine` for build and runtime; the image command is `["node", "dist/index.js"]`. That version is separate from the Node.js 22 contract job.
+The Dockerfile uses `node:24-alpine` for build and runtime; the image command is `["node", "dist/index.js"]`. GitHub Packages credentials are only mounted as BuildKit secrets (`npmrc`, `node_auth_token`) during `npm ci`.
 
 Before running Docker, check service variables, build secrets and networks in the repository files. Green CI validates its jobs; it does not prove business-service availability in a remote environment.
 
