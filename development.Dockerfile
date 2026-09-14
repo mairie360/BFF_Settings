@@ -1,5 +1,5 @@
 # Étape 1 : build
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -7,7 +7,7 @@ COPY . .
 RUN npm run build
 
 # Étape 2 : run
-FROM node:20-alpine
+FROM node:24-alpine
 # AJOUT DE CURL ICI (Alpine utilise apk)
 RUN apk add --no-cache curl
 
