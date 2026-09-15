@@ -42,9 +42,12 @@ schema — CI (`contracts:check`) and a jest test both fail otherwise. See "Cont
 - `authorization(req)` — requires `Authorization: Bearer <token>`, throws `UpstreamError(401)`.
 - `baseUrl(service)` — resolves the target from env vars `<SERVICE>_URL` (+ optional `<SERVICE>_PORT`),
   e.g. `CORE_API_URL`. Missing config -> `UpstreamError(503)`.
-- `json(req, service, path, init)` — typed JSON call; maps non-2xx and network errors to `UpstreamError`.
+- `json(req, service, path, init)` — typed JSON call; keeps upstream 4xx, maps 5xx and network errors to
+  `UpstreamError(502)`. An empty 2xx body returns `undefined` (Core answers `PATCH /api/v1/user/me/` with an
+  empty 200, not a 204).
 - `forward(req, res, service, path)` — transparent proxy that preserves method, body (incl. binary /
-  multipart), status, and a whitelist of response headers. Used by the preference adapters.
+  multipart), 2xx–4xx status, and a whitelist of response headers; an upstream 5xx becomes a 502 without
+  its body. Used by the preference adapters.
 - `routeError(res, err)` — the single error response shape: `{ error: { message } }`, status from
   `UpstreamError.status` or 502.
 
@@ -59,8 +62,10 @@ schema — CI (`contracts:check`) and a jest test both fail otherwise. See "Cont
     and empty bodies are 400, never a silent success), PATCHes Core, then **re-reads** and returns the
     persisted profile.
   - `PATCH /settings/{notifications,appearance,general}` are pass-through adapters via `forward()` —
-    they preserve Core's status (including 404 when the Core route isn't deployed) and never fabricate
-    a local save.
+    they preserve Core's status (including 404: Core 1.1.1 serves neither `notification-settings/` nor
+    `preferences/`) and never fabricate a local save.
+  - Every `/settings` route documents 401/502/503 through `upstreamErrors`; the contract tests fail on
+    any status the route can return but does not declare.
 
 ## Contract pipeline
 
@@ -73,6 +78,28 @@ The OpenAPI document is generated from the code, not hand-written:
 5. `scripts/contracts.mjs` runs `openapi-typescript@7.10.1` (pinned, via `npm exec`) to produce
    `contracts/bff.d.ts`.
 6. `tests/contracts.test.ts` asserts the live document equals the committed `contracts/openapi.json`.
+
+## Tests with a contract-driven Core API mock
+
+`tests/settings.upstream-mocks.test.ts` imports the **whole app** with the **real** `fetch` client and serves
+Core API from a local HTTP server (`tests/support/contract-mock-server.ts`). The Core contract is rebuilt at
+test time from the **installed** `@mairie360/core-api-openapi` devDependency (`tests/support/orval-contract.ts`
+parses the orval `endpoints/*.ts` + `model/*.ts` with the TypeScript compiler API), so bumping the package is
+enough to test a new contract. The mock rejects paths, methods, params and bodies absent from the contract and
+validates mocked success responses; orval does not type errors, so mocked error replies need
+`outOfContract: true`. Every BFF response is checked against `contracts/openapi.json` (status documented +
+schema), so an undocumented status fails the test. `tests/upstream-contracts.test.ts` pins the package
+version, the consumed operations, BFF↔Core schema compatibility and the known gaps.
+
+- `CORE_API_URL` / `CORE_API_PORT` are read per request, so tests set them in `beforeEach` (no module reload).
+- Known gaps are accepted with a justified `allowDeviation`: `GET /api/v1/sessions/` is typed by orval as the
+  roles `GetResponseView` (Core really returns `{ sessions }`), and the preference routes are absent from Core
+  (the mock answers 404, like Core). When a gap test in `upstream-contracts.test.ts` fails, remove the deviation.
+- Fixtures live in `tests/support/core-fixtures.ts` and are validated against the contract.
+- `openapi-contract.ts`, `contract-mock-server.ts` and `orval-contract.ts` are shared verbatim with `BFF_user`,
+  `BFF_Calendar`, `BFF_Dashboard`, `BFF_Elearning` and `BFF_Message`; keep the copies identical.
+- `.npmrc` sets `min-release-age=7`: npm 11 refuses a freshly published `@mairie360/*` version unless run with
+  `--min-release-age=0`.
 
 ## Isolated test stacks (perf / security)
 
@@ -104,15 +131,15 @@ scan will surface it — fix or triage rather than blanket-ignoring.
   so the sync branch is an inert stub — syncing to web-service repos is not wired up here.
 - `src/views/check_api_view.ts` defines `CheckApiResponseSchema` but the `check_apis` route builds its
   response object ad hoc; the schema is not what's served.
-- `.npmrc` points `@mairie360:*` at GitHub Packages and needs `NODE_AUTH_TOKEN`, even though there are
-  currently no `@mairie360/*` dependencies.
+- `.npmrc` points `@mairie360:*` at GitHub Packages and needs `NODE_AUTH_TOKEN`; the only `@mairie360/*`
+  package is the `core-api-openapi` devDependency used by the tests (no runtime client).
 - `cicd.yml` calls the shared `mairie360/CICD` `BFFs-cicd.yml@v2.3.0` (with `openapi_spec_path` and
   explicit `CODECOV_TOKEN` / `N8N_WEBHOOK_SECRET` secrets); Renovate keeps `cicd_version` aligned with
   the tag, and `.releaserc.json` drives semantic-release.
 - The test stacks pin `database` / `liquibase-migrations` 1.1.0, `core-api` 1.1.1 and `bff-user` 0.4.0.
   Core API ≥ 1.1.1 panics on `/user/me` for users without a role, so `init-test.sql` gives user 2 the
   `User` role.
-- Tests mock `globalThis.fetch`; `tests/contracts.test.ts` requires `contracts/openapi.json` to exist.
+- `tests/contracts.test.ts` mocks `globalThis.fetch` and requires `contracts/openapi.json` to exist.
 
 ## Docs
 
