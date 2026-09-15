@@ -35,10 +35,13 @@ export async function upstream(req: Request, service: string, path: string, init
 
 export async function json<T>(req: Request, service: string, path: string, init: RequestInit = {}): Promise<T> {
   const response = await upstream(req, service, path, init);
-  if (!response.ok) throw new UpstreamError(response.status, `Le service ${service} a répondu ${response.status}.`);
-  if (response.status === 204) return undefined as T;
-  try { return await response.json() as T; }
-  catch { throw new UpstreamError(502, `La réponse de ${service} est invalide.`); }
+  // Les 4xx amont sont conservés ; une panne amont (5xx) devient 502 côté BFF.
+  if (!response.ok) throw new UpstreamError(response.status >= 500 ? 502 : response.status, `Le service ${service} a répondu ${response.status}.`);
+  // Un succès sans corps est valide (Core répond 200 vide à PATCH /api/v1/user/me/).
+  try {
+    const text = await response.text();
+    return (text ? JSON.parse(text) : undefined) as T;
+  } catch { throw new UpstreamError(502, `La réponse de ${service} est invalide.`); }
 }
 
 export function routeError(res: Response, error: unknown) {
@@ -57,6 +60,11 @@ export async function forward(req: Request, res: Response, service: string, path
         headers: { 'Content-Type': req.headers['content-type'] ?? 'application/json' },
       } : {}),
     });
+    if (response.status >= 500) {
+      // Le corps d'une panne amont n'est jamais relayé : seul le statut 502 l'est.
+      await response.body?.cancel();
+      throw new UpstreamError(502, `Le service ${service} a répondu ${response.status}.`);
+    }
     res.status(response.status);
     for (const header of ['content-type', 'content-disposition', 'etag']) {
       const value = response.headers.get(header);
