@@ -12,19 +12,7 @@ import { loadOrvalContract } from './support/orval-contract';
 // typées par orval : toute réponse d'erreur simulée est marquée `outOfContract`. Chaque réponse du BFF est validée
 // contre contracts/openapi.json.
 
-const coreApi = new ContractMockServer('CORE_API', loadOrvalContract('@mairie360/core-api-openapi'))
-  .allowDeviation(
-    /réponse 200 GET \/api\/v1\/sessions\/ \$\.roles: propriété requise manquante/,
-    // Core API renvoie { sessions } (Core_API src/endpoints/v1/sessions/get/response_view.rs), mais orval a fusionné
-    // les deux structs Rust GetResponseView et type la réponse comme la liste des rôles.
-    'Contrat Core API erroné sur la réponse de GET /api/v1/sessions/',
-  )
-  .allowDeviation(
-    /requête PATCH \/api\/v1\/user\/me\/(notification-settings|preferences)\/ : .* n'existe pas dans le contrat core_api/,
-    // Les adaptateurs de préférences visent des routes que Core API 1.1.1 ne sert pas encore : le mock répond 404
-    // comme Core, et le BFF doit relayer ce 404 sans simuler de sauvegarde (vérifié dans upstream-contracts.test.ts).
-    'Routes de préférences absentes de Core API 1.1.1',
-  );
+const coreApi = new ContractMockServer('CORE_API', loadOrvalContract('@mairie360/core-api-openapi'));
 const bffContract = OpenApiContract.load(path.join(__dirname, '..', 'contracts', 'openapi.json'));
 
 beforeAll(async () => { await coreApi.start(); });
@@ -65,7 +53,6 @@ async function withUnreachableCore() {
 const BFF_ROUTES = [
   { method: 'get', path: '/settings/bootstrap', body: undefined },
   { method: 'patch', path: '/settings/profile', body: { first_name: 'Anne' } },
-  ...PREFERENCE_TARGETS.map(({ section }) => ({ method: 'patch', path: `/settings/${section}`, body: { theme: 'dark' } })),
 ] as const;
 
 function call(route: (typeof BFF_ROUTES)[number], authorization?: string) {
@@ -217,7 +204,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
 
       expect(response.status).toBe(502);
       expectBffContract('get', '/settings/bootstrap', response);
-      expect(response.body).toEqual({ error: { message: 'Les données du service sont indisponibles.' } });
+      expect(response.body).toEqual({ error: { message: 'La réponse de CORE_API est invalide.' } });
     });
   });
 
@@ -314,14 +301,15 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
   });
 
   describe('PATCH /settings/{notifications,appearance,general}', () => {
-    test.each(PREFERENCE_TARGETS)('/settings/$section relays the Core 404 of $template and never fabricates a save', async ({ section }) => {
+    test.each(PREFERENCE_TARGETS)('/settings/$section answers 404 without calling Core API and never fabricates a save', async ({ section }) => {
       const response = await withSession(request(app).patch(`/settings/${section}`).send({ theme: 'dark', emailDigest: false }));
 
       expect(response.status).toBe(404);
       expectBffContract('patch', `/settings/${section}`, response);
       expect(response.type).toBe('application/json');
       expect(response.headers['cache-control']).toBe('no-store');
-      expect(response.body).toEqual({ error: { message: 'Route absente du contrat' } });
+      expect(response.body).toEqual({ error: { message: 'Cette préférence n’est pas encore gérée par Core API.' } });
+      expect(coreApi.requests).toEqual([]);
     });
   });
 

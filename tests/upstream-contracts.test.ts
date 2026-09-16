@@ -53,6 +53,10 @@ describe('Core API contract from the installed @mairie360/core-api-openapi packa
     // Core répond 200 sans corps : aucun schéma de réponse, le BFF doit relire le profil.
     expect(coreApi.responseSchema(patchMe, 200)).toEqual({ documented: true, schema: undefined });
 
+    const sessions = coreApi.match('GET', '/api/v1/sessions/')!;
+    expect(coreApi.responseSchema(sessions, 200)).toEqual({ documented: true, schema: { $ref: '#/components/schemas/GetSessionsResultView' } });
+    expect(coreApi.validate(coreApi.schema('GetSessionsResultView'), { sessions: [session('s-1')] })).toEqual([]);
+
     expect(coreApi.responseSchema(coreApi.match('GET', '/health')!, 200)).toEqual({ documented: true, schema: undefined });
     // Les erreurs ne sont pas typées par orval : aucun statut hors 2XX n'est documenté.
     expect(coreApi.responseSchema(getMe, 401).documented).toBe(false);
@@ -74,17 +78,7 @@ describe('BFF Settings schemas stay compatible with the Core API contract', () =
 });
 
 describe('known gaps between the Core API contract and what the BFF calls', () => {
-  // Quand un de ces tests échoue, le paquet publié a changé : retirer l'allowDeviation correspondant de
-  // settings.upstream-mocks.test.ts et mocker la vraie opération.
-
-  test('GET /api/v1/sessions/ is typed with the roles GetResponseView instead of { sessions }', () => {
-    // Deux structs Rust GetResponseView (rôles et sessions) : orval n'en garde qu'une.
-    const schema = responseSchema('get', '/api/v1/sessions/');
-    expect(schema).toEqual({ $ref: '#/components/schemas/GetResponseView' });
-    expect(coreApi.validate(schema, { sessions: [session('s-1')] })).toEqual(['$.roles: propriété requise manquante']);
-    // La forme réellement servie par Core (Core_API src/endpoints/v1/sessions/get/response_view.rs) existe sous un autre nom.
-    expect(coreApi.validate(coreApi.schema('HistoryResponseView'), { sessions: [session('s-1')] })).toEqual([]);
-  });
+  // Quand ce test échoue, Core API expose les préférences : le BFF doit les relayer au lieu de répondre 404.
 
   test.each(PREFERENCE_TARGETS)('PATCH $template (/settings/$section) is not exposed by Core API', ({ template }) => {
     expect(coreApi.document.paths[template]).toBeUndefined();
