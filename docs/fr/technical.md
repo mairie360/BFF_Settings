@@ -63,15 +63,15 @@ Inventaire extrait de `contracts/openapi.json`. Les paramètres entre accolades 
 | --- | --- | --- | --- |
 | GET | `/health` | — | 200 |
 | GET | `/check_apis` | — | 200, 502 |
-| GET | `/settings/bootstrap` | — | 200, 401, 502 |
-| PATCH | `/settings/profile` | application/json | 200, 400 |
-| PATCH | `/settings/notifications` | application/json | 200, 404 |
-| PATCH | `/settings/appearance` | application/json | 200, 404 |
-| PATCH | `/settings/general` | application/json | 200, 404 |
+| GET | `/settings/bootstrap` | — | 200, 401, 502, 503 |
+| PATCH | `/settings/profile` | application/json | 200, 400, 401, 502, 503 |
+| PATCH | `/settings/notifications` | application/json | 200, 400, 401, 404, 502, 503 |
+| PATCH | `/settings/appearance` | application/json | 200, 400, 401, 404, 502, 503 |
+| PATCH | `/settings/general` | application/json | 200, 400, 401, 404, 502, 503 |
 
 ## Session, permissions et erreurs
 
-Toutes les routes `/settings` exigent un Bearer. Les erreurs de profil bloquent le bootstrap; les erreurs de session positionnent `sources.sessions` à `unavailable`. Les appels Core ont un délai de 10 secondes et les réponses métier utilisent `no-store`.
+Toutes les routes `/settings` exigent un Bearer. Les erreurs de profil bloquent le bootstrap; les erreurs de session positionnent `sources.sessions` à `unavailable`. Les appels Core ont un délai de 10 secondes et les réponses métier utilisent `no-store`. Les 4xx de Core sont conservés; une panne Core (réseau, délai ou 5xx) produit 502 sans relayer le corps amont, et un Core non configuré produit 503. Un succès Core sans corps (Core répond 200 vide à `PATCH /api/v1/user/me/`) est accepté, puis le profil est relu.
 
 ## Synchronisation et vérifications
 
@@ -82,6 +82,8 @@ npm test -- --runInBand
 npm run lint
 npm run build
 ```
+
+Les tests de `tests/settings.upstream-mocks.test.ts` exécutent toute l'application avec le vrai client `fetch` contre un serveur HTTP local simulant Core API. Son contrat est reconstruit depuis le paquet `@mairie360/core-api-openapi` installé (types orval, version épinglée dans `package.json`): chaque requête sortante (chemin, paramètres, corps JSON) et chaque réponse de succès simulée est validée contre ce contrat, et chaque réponse du BFF contre `contracts/openapi.json`. Monter la version du paquet suffit à tester le nouveau contrat; les statuts d'erreur ne sont pas typés par orval et sont simulés explicitement. `tests/upstream-contracts.test.ts` épingle la version, les opérations consommées et les écarts connus (réponse de `GET /api/v1/sessions/` mal typée, routes de préférences absentes de Core).
 
 `contracts:generate` exporte le registre runtime dans `contracts/openapi.json` et régénère `contracts/bff.d.ts`. `contracts:check` échoue si le contrat ou les types sont périmés. Exécuter ensuite `npm run contracts:sync` dans chaque web service associé et livrer les modifications de contrat ensemble.
 

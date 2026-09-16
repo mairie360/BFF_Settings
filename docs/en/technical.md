@@ -63,15 +63,15 @@ Inventory extracted from `contracts/openapi.json`. Replace brace parameters with
 | --- | --- | --- | --- |
 | GET | `/health` | — | 200 |
 | GET | `/check_apis` | — | 200, 502 |
-| GET | `/settings/bootstrap` | — | 200, 401, 502 |
-| PATCH | `/settings/profile` | application/json | 200, 400 |
-| PATCH | `/settings/notifications` | application/json | 200, 404 |
-| PATCH | `/settings/appearance` | application/json | 200, 404 |
-| PATCH | `/settings/general` | application/json | 200, 404 |
+| GET | `/settings/bootstrap` | — | 200, 401, 502, 503 |
+| PATCH | `/settings/profile` | application/json | 200, 400, 401, 502, 503 |
+| PATCH | `/settings/notifications` | application/json | 200, 400, 401, 404, 502, 503 |
+| PATCH | `/settings/appearance` | application/json | 200, 400, 401, 404, 502, 503 |
+| PATCH | `/settings/general` | application/json | 200, 400, 401, 404, 502, 503 |
 
 ## Session, permissions and errors
 
-All `/settings` routes require a Bearer token. Profile errors block bootstrap; session errors set `sources.sessions` to `unavailable`. Core calls have a 10-second timeout and business responses use `no-store`.
+All `/settings` routes require a Bearer token. Profile errors block bootstrap; session errors set `sources.sessions` to `unavailable`. Core calls have a 10-second timeout and business responses use `no-store`. Core 4xx statuses are preserved; a Core outage (network, timeout or 5xx) becomes 502 without relaying the upstream body, and an unconfigured Core becomes 503. A Core success without body (Core answers an empty 200 to `PATCH /api/v1/user/me/`) is accepted, then the profile is re-read.
 
 ## Synchronization and verification
 
@@ -82,6 +82,8 @@ npm test -- --runInBand
 npm run lint
 npm run build
 ```
+
+The tests in `tests/settings.upstream-mocks.test.ts` run the whole application with the real `fetch` client against a local HTTP server simulating Core API. Its contract is rebuilt from the installed `@mairie360/core-api-openapi` package (orval types, version pinned in `package.json`): every outgoing request (path, parameters, JSON body) and every mocked success response is validated against that contract, and every BFF response against `contracts/openapi.json`. Bumping the package version is enough to test the new contract; error statuses are not typed by orval and are simulated explicitly. `tests/upstream-contracts.test.ts` pins the version, the consumed operations and the known gaps (mistyped `GET /api/v1/sessions/` response, preference routes missing from Core).
 
 `contracts:generate` exports the runtime registry to `contracts/openapi.json` and regenerates `contracts/bff.d.ts`. `contracts:check` fails when the contract or types are stale. Then run `npm run contracts:sync` in each associated web service and deliver contract changes together.
 

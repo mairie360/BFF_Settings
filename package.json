@@ -2,36 +2,39 @@
   "name": "bff-settings",
   "version": "1.0.0",
   "scripts": {
-    "start": "ts-node src/index.ts",
-    "build": "tsc",
+    "start": "tsx watch src/index.ts",
+    "build": "tsc --noEmit && node scripts/build.mjs",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "test": "jest",
-    "openapi:extract": "ts-node scripts/export-swagger.ts",
+    "openapi:extract": "tsx scripts/export-swagger.ts",
     "contracts:generate": "npm run openapi:extract && node scripts/contracts.mjs --generate",
     "contracts:check": "npm run openapi:extract -- --check && node scripts/contracts.mjs --check"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "9.1.0",
+    "axios": "1.20.0",
     "dotenv": "17.4.2",
     "express": "5.2.1",
-    "@asteasolutions/zod-to-openapi": "9.1.0",
-    "zod": "4.6.5",
-    "swagger-ui-express": "5.0.1"
+    "swagger-ui-express": "5.0.1",
+    "zod": "4.6.5"
   },
   "devDependencies": {
+    "@mairie360/core-api-openapi": "1.2.0",
     "@types/express": "5.0.6",
     "@types/jest": "30.0.0",
+    "@types/node": "^24.0.0",
     "@types/supertest": "7.2.1",
+    "@types/swagger-ui-express": "4.1.8",
     "@typescript-eslint/eslint-plugin": "8.70.0",
     "@typescript-eslint/parser": "8.70.0",
+    "esbuild": "0.28.2",
     "eslint": "9.39.5",
     "jest": "30.5.1",
     "supertest": "7.2.2",
     "ts-jest": "29.4.12",
-    "ts-node": "10.9.2",
+    "tsx": "4.23.13",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.70.0",
-    "@types/swagger-ui-express": "4.1.8",
-    "@types/node": "^24.0.0"
+    "typescript-eslint": "8.70.0"
   }
 }
