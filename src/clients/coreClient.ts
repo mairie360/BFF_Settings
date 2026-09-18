@@ -1,4 +1,4 @@
-import { getCoreApi } from '@mairie360/core-api-openapi/endpoints/coreApi';
+import { getCoreAPIMairie360 } from '@mairie360/core-api-openapi/endpoints/coreAPIMairie360';
 import axios, { type AxiosRequestConfig } from 'axios';
 import type { Request } from 'express';
 import { ZodError } from 'zod';
@@ -7,7 +7,7 @@ import { authorization, baseUrl, UpstreamError } from './upstream';
 // Core API n'est appelée que par les opérations de son contrat publié (@mairie360/core-api-openapi).
 const coreAxios = axios.create({ timeout: 10_000, headers: { Accept: 'application/json' } });
 
-export const coreApi = getCoreApi(coreAxios);
+export const coreApi = getCoreAPIMairie360(coreAxios);
 
 /**
  * Options d'un appel Core au nom de l'appelant. L'URL est relue à chaque requête (les variables
