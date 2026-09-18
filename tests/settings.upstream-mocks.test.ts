@@ -2,7 +2,7 @@ import path from 'node:path';
 import request from 'supertest';
 import app from '../src/app';
 import { ContractMockServer, unreachableUrl, type MockReply } from './support/contract-mock-server';
-import { PREFERENCE_TARGETS, bearer, meResponse, profileOf, session } from './support/core-fixtures';
+import { PREFERENCE_TARGETS, bearer, coreApiUrls, meResponse, patchMe, profileOf, session, sessionsResult } from './support/core-fixtures';
 import { OpenApiContract } from './support/openapi-contract';
 import { loadOrvalContract } from './support/orval-contract';
 
@@ -10,9 +10,15 @@ import { loadOrvalContract } from './support/orval-contract';
 // est reconstruit depuis le paquet @mairie360/core-api-openapi installé (version épinglée dans package.json) : le mock
 // refuse les routes, paramètres et corps absents du contrat et valide ses réponses de succès. Les erreurs ne sont pas
 // typées par orval : toute réponse d'erreur simulée est marquée `outOfContract`. Chaque réponse du BFF est validée
-// contre contracts/openapi.json.
+// contre contracts/openapi.json. Les corps simulés sont typés par les modèles générés et les chemins attendus
+// viennent des helpers d'URL du client généré.
 
 const coreApi = new ContractMockServer('CORE_API', loadOrvalContract('@mairie360/core-api-openapi'));
+// Gabarits du contrat Core API (clés des mocks) ; les chemins concrets attendus viennent de coreApiUrls.
+const CORE = { me: '/api/v1/user/me/', sessions: '/api/v1/sessions/', health: '/health' } as const;
+/** Appels reçus par Core API, sous la forme `MÉTHODE chemin` (chemin tel que le construit le client généré). */
+const upstreamSequence = () => coreApi.requests.map((call) => `${call.method} ${call.url.pathname}`);
+const called = (method: string, url: string) => `${method} ${url}`;
 const bffContract = OpenApiContract.load(path.join(__dirname, '..', 'contracts', 'openapi.json'));
 
 beforeAll(async () => { await coreApi.start(); });
@@ -103,8 +109,8 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       const me = meResponse();
       const sessions = [session('s-1'), session('s-2', { revoked_at: '2026-09-16T08:00:00Z' })];
       coreApi
-        .on('get', '/api/v1/user/me/', { body: me })
-        .on('get', '/api/v1/sessions/', { body: { sessions } });
+        .on('get', CORE.me, { body: me })
+        .on('get', CORE.sessions, { body: sessionsResult(sessions) });
 
       const response = await withSession(request(app).get('/settings/bootstrap'), 'session-42');
 
@@ -113,8 +119,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(response.headers['cache-control']).toBe('no-store');
       // groups, role et status de Core ne sortent pas du BFF.
       expect(response.body).toEqual({ profile: profileOf(me), sessions, sources: { sessions: 'available' } });
-      expect(coreApi.requests.map(({ method, template }) => `${method} ${template}`))
-        .toEqual(['GET /api/v1/user/me/', 'GET /api/v1/sessions/']);
+      expect(upstreamSequence()).toEqual([called('GET', coreApiUrls.getGetMeUrl()), called('GET', coreApiUrls.getGetActiveSessionsUrl())]);
       for (const upstream of coreApi.requests) {
         expect(upstream.headers.authorization).toBe(bearer('session-42'));
         expect(upstream.headers.accept).toBe('application/json');
@@ -125,8 +130,8 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
 
     test('strips internal session fields sent by Core', async () => {
       coreApi
-        .on('get', '/api/v1/user/me/', { body: meResponse() })
-        .on('get', '/api/v1/sessions/', { body: { sessions: [{ ...session('s-1'), token_hash: 'hash-interne', user_id: 2 }] } });
+        .on('get', CORE.me, { body: meResponse() })
+        .on('get', CORE.sessions, { body: { sessions: [{ ...session('s-1'), token_hash: 'hash-interne', user_id: 2 }] } });
 
       const response = await withSession(request(app).get('/settings/bootstrap'));
 
@@ -137,14 +142,14 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
 
     test('keeps a null phone and accepts a profile without phone', async () => {
       const me = meResponse({ phone: null, groups: [] });
-      coreApi.on('get', '/api/v1/user/me/', { body: me }).on('get', '/api/v1/sessions/', { body: { sessions: [] } });
+      coreApi.on('get', CORE.me, { body: me }).on('get', CORE.sessions, { body: sessionsResult([]) });
 
       const nullPhone = await withSession(request(app).get('/settings/bootstrap'));
       expect(nullPhone.status).toBe(200);
       expectBffContract('get', '/settings/bootstrap', nullPhone);
       expect(nullPhone.body.profile).toEqual({ ...profileOf(me), phone: null });
 
-      coreApi.on('get', '/api/v1/user/me/', { body: without(me, 'phone') });
+      coreApi.on('get', CORE.me, { body: without(me, 'phone') });
       const missingPhone = await withSession(request(app).get('/settings/bootstrap'));
       expect(missingPhone.status).toBe(200);
       expectBffContract('get', '/settings/bootstrap', missingPhone);
@@ -160,7 +165,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       ['a dropped connection', { dropConnection: true }],
     ])('still returns the profile with sessions marked unavailable on %s', async (_label, reply) => {
       const me = meResponse();
-      coreApi.on('get', '/api/v1/user/me/', { body: me }).on('get', '/api/v1/sessions/', reply);
+      coreApi.on('get', CORE.me, { body: me }).on('get', CORE.sessions, reply);
 
       const response = await withSession(request(app).get('/settings/bootstrap'));
 
@@ -170,14 +175,14 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
     });
 
     test('preserves a Core 401 on the profile without reading sessions', async () => {
-      coreApi.on('get', '/api/v1/user/me/', coreError(401, ''));
+      coreApi.on('get', CORE.me, coreError(401, ''));
 
       const response = await withSession(request(app).get('/settings/bootstrap'), 'session-expiree');
 
       expect(response.status).toBe(401);
       expectBffContract('get', '/settings/bootstrap', response);
       expect(response.body).toEqual({ error: { message: 'Le service CORE_API a répondu 401.' } });
-      expect(coreApi.calls('/api/v1/sessions/')).toHaveLength(0);
+      expect(coreApi.calls(CORE.sessions)).toHaveLength(0);
     });
 
     test.each<[string, MockReply, string]>([
@@ -186,7 +191,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       ['invalid JSON', { raw: '<html>proxy</html>', contentType: 'text/html', outOfContract: true }, 'La réponse de CORE_API est invalide.'],
       ['a dropped connection', { dropConnection: true }, 'Le service CORE_API est indisponible.'],
     ])('maps %s on the profile to 502 without leaking the upstream body', async (_label, reply, message) => {
-      coreApi.on('get', '/api/v1/user/me/', reply);
+      coreApi.on('get', CORE.me, reply);
 
       const response = await withSession(request(app).get('/settings/bootstrap'));
 
@@ -194,11 +199,11 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expectBffContract('get', '/settings/bootstrap', response);
       expect(response.body).toEqual({ error: { message } });
       expect(JSON.stringify(response.body)).not.toMatch(/database|proxy/);
-      expect(coreApi.calls('/api/v1/sessions/')).toHaveLength(0);
+      expect(coreApi.calls(CORE.sessions)).toHaveLength(0);
     });
 
     test('answers 502 instead of a partial profile when Core omits a required field', async () => {
-      coreApi.on('get', '/api/v1/user/me/', { body: without(meResponse(), 'email'), outOfContract: true });
+      coreApi.on('get', CORE.me, { body: without(meResponse(), 'email'), outOfContract: true });
 
       const response = await withSession(request(app).get('/settings/bootstrap'));
 
@@ -210,15 +215,15 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
 
   describe('PATCH /settings/profile', () => {
     test.each([
-      ['200 without body, as Core API 1.1.1 does', { status: 200 }],
+      ['200 without body, as Core API does', { status: 200 }],
       ['204', { status: 204 }],
     ] as const)('sends the patch to PATCH /api/v1/user/me/, accepts a %s and returns the re-read profile', async (_label, patchReply) => {
-      const patch = { first_name: 'Anne Marie', last_name: 'Le Gall', email: 'anne.marie@mairie.test', phone: '+33987654321' };
+      const patch = patchMe({ first_name: 'Anne Marie', last_name: 'Le Gall', email: 'anne.marie@mairie.test', phone: '+33987654321' });
       // Le profil relu fait foi, même s'il diffère de ce qui a été envoyé (normalisation côté Core).
-      const persisted = meResponse({ ...patch, email: 'anne.marie@mairie.test', last_name: 'LE GALL' });
+      const persisted = meResponse({ first_name: 'Anne Marie', last_name: 'LE GALL', email: 'anne.marie@mairie.test', phone: '+33987654321' });
       coreApi
-        .on('patch', '/api/v1/user/me/', patchReply)
-        .on('get', '/api/v1/user/me/', { body: persisted });
+        .on('patch', CORE.me, patchReply)
+        .on('get', CORE.me, { body: persisted });
 
       const response = await withSession(request(app).patch('/settings/profile').send(patch), 'session-42');
 
@@ -226,8 +231,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expectBffContract('patch', '/settings/profile', response);
       expect(response.headers['cache-control']).toBe('no-store');
       expect(response.body).toEqual(profileOf(persisted));
-      expect(coreApi.requests.map(({ method, template }) => `${method} ${template}`))
-        .toEqual(['PATCH /api/v1/user/me/', 'GET /api/v1/user/me/']);
+      expect(upstreamSequence()).toEqual([called('PATCH', coreApiUrls.getPatchMeUrl()), called('GET', coreApiUrls.getGetMeUrl())]);
       const [sent, reread] = coreApi.requests;
       expect(sent.body).toEqual(patch);
       expect(sent.headers['content-type']).toBe('application/json');
@@ -237,16 +241,16 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
     });
 
     test.each([
-      ['a single field', { last_name: 'Le Gall-Martin' }],
-      ['a phone removal', { phone: null }],
-    ])('forwards only %s', async (_label, patch) => {
-      coreApi.on('patch', '/api/v1/user/me/', { status: 200 }).on('get', '/api/v1/user/me/', { body: meResponse(patch) });
+      ['a single field', patchMe({ last_name: 'Le Gall-Martin' }), meResponse({ last_name: 'Le Gall-Martin' })],
+      ['a phone removal', patchMe({ phone: null }), meResponse({ phone: null })],
+    ])('forwards only %s', async (_label, patch, persisted) => {
+      coreApi.on('patch', CORE.me, { status: 200 }).on('get', CORE.me, { body: persisted });
 
       const response = await withSession(request(app).patch('/settings/profile').send(patch));
 
       expect(response.status).toBe(200);
       expectBffContract('patch', '/settings/profile', response);
-      expect(coreApi.calls('/api/v1/user/me/', 'patch')[0].body).toEqual(patch);
+      expect(coreApi.calls(CORE.me, 'patch')[0].body).toEqual(patch);
     });
 
     test.each([
@@ -279,18 +283,18 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       ['a Core 400', coreError(400, 'Json deserialize error'), 400],
       ['a Core 500', coreError(500), 502],
     ])('does not report a save and does not re-read on %s', async (_label, reply, status) => {
-      coreApi.on('patch', '/api/v1/user/me/', reply);
+      coreApi.on('patch', CORE.me, reply);
 
       const response = await withSession(request(app).patch('/settings/profile').send({ first_name: 'Anne' }));
 
       expect(response.status).toBe(status);
       expectBffContract('patch', '/settings/profile', response);
       expect(response.body).toEqual({ error: { message: `Le service CORE_API a répondu ${reply.status}.` } });
-      expect(coreApi.calls('/api/v1/user/me/', 'get')).toHaveLength(0);
+      expect(coreApi.calls(CORE.me, 'get')).toHaveLength(0);
     });
 
     test('answers 502 when the saved profile cannot be re-read', async () => {
-      coreApi.on('patch', '/api/v1/user/me/', { status: 200 }).on('get', '/api/v1/user/me/', coreError(500));
+      coreApi.on('patch', CORE.me, { status: 200 }).on('get', CORE.me, coreError(500));
 
       const response = await withSession(request(app).patch('/settings/profile').send({ first_name: 'Anne' }));
 
@@ -315,22 +319,22 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
 
   describe('GET /check_apis', () => {
     test('reports Core API connected when GET /health answers', async () => {
-      coreApi.on('get', '/health', { raw: 'OK', contentType: 'text/plain' });
+      coreApi.on('get', CORE.health, { raw: 'OK', contentType: 'text/plain' });
 
       const response = await request(app).get('/check_apis');
 
       expect(response.status).toBe(200);
       expectBffContract('get', '/check_apis', response);
       expect(response.body).toEqual({ status: 'OK', core_api: 'Connected' });
-      const [health] = coreApi.calls('/health', 'get');
+      const [health] = coreApi.calls(CORE.health, 'get');
       expect(coreApi.requests).toHaveLength(1);
       // Sonde de disponibilité : aucune session n'est transmise.
       expect(health.headers.authorization).toBeUndefined();
     });
 
     test.each<[string, () => Promise<void>]>([
-      ['answers 500', async () => { coreApi.on('get', '/health', coreError(500)); }],
-      ['drops the connection', async () => { coreApi.on('get', '/health', { dropConnection: true }); }],
+      ['answers 500', async () => { coreApi.on('get', CORE.health, coreError(500)); }],
+      ['drops the connection', async () => { coreApi.on('get', CORE.health, { dropConnection: true }); }],
       ['is unreachable', withUnreachableCore],
       ['is not configured', async () => { delete process.env.CORE_API_URL; }],
     ])('reports Core API unreachable with 502 when it %s', async (_label, arrange) => {

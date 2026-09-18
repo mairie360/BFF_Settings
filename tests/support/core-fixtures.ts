@@ -1,12 +1,19 @@
-// Réponses Core API conformes au contrat du paquet @mairie360/core-api-openapi installé
-// (validées dans upstream-contracts.test.ts) et jetons de session des tests.
+import { getCoreAPIMairie360 } from '@mairie360/core-api-openapi/endpoints/coreAPIMairie360';
+import type { GetMeResponseView, GetSessionsResultView, Group, PatchMeView, SessionSchema } from '@mairie360/core-api-openapi/model';
 
-export function group(id: number, overrides: Partial<{ name: string; description: string | null; owner_id: number }> = {}) {
+// Réponses Core API typées par les modèles du paquet @mairie360/core-api-openapi installé : un champ ajouté,
+// retiré ou renommé par le contrat fait échouer la compilation des tests. Elles sont en plus validées à
+// l'exécution contre le contrat reconstruit (upstream-contracts.test.ts, mock HTTP). Jetons de session des tests.
+
+/** Chemins des opérations Core API, tels que les construit le client généré (helpers `get*Url`). */
+export const coreApiUrls = getCoreAPIMairie360();
+
+export function group(id: number, overrides: Partial<Group> = {}): Group {
   return { id, name: `Groupe ${id}`, description: `Description ${id}`, owner_id: 1, ...overrides };
 }
 
 /** Corps de `GET /api/v1/user/me/` (GetMeResponseView). `groups`, `role` et `status` ne sont pas lus par le BFF Settings. */
-export function meResponse(overrides: Partial<{ first_name: string; last_name: string; email: string; phone: string | null; role: string; groups: Array<ReturnType<typeof group>> }> = {}) {
+export function meResponse(overrides: Partial<GetMeResponseView> = {}): GetMeResponseView {
   return {
     email: 'anne.le-gall@mairie.test',
     first_name: 'Anne Marie',
@@ -20,13 +27,16 @@ export function meResponse(overrides: Partial<{ first_name: string; last_name: s
 }
 
 /** Profil attendu en sortie du BFF pour un corps `GET /api/v1/user/me/`. */
-export function profileOf(me: ReturnType<typeof meResponse>) {
+export function profileOf(me: GetMeResponseView): Pick<GetMeResponseView, 'first_name' | 'last_name' | 'email' | 'phone'> {
   const { first_name, last_name, email, phone } = me;
   return { first_name, last_name, email, phone };
 }
 
+/** Corps de `PATCH /api/v1/user/me/` (PatchMeView). */
+export const patchMe = (patch: PatchMeView): PatchMeView => patch;
+
 /** Session Core (SessionSchema). */
-export function session(id: string, overrides: Partial<{ device_info: string; revoked_at: string | null }> = {}) {
+export function session(id: string, overrides: Partial<SessionSchema> = {}): SessionSchema {
   return {
     id,
     device_info: 'Firefox sur Linux',
@@ -38,11 +48,14 @@ export function session(id: string, overrides: Partial<{ device_info: string; re
   };
 }
 
+/** Corps de `GET /api/v1/sessions/` (GetSessionsResultView). */
+export const sessionsResult = (sessions: SessionSchema[]): GetSessionsResultView => ({ sessions });
+
 /** Le BFF Settings ne vérifie que la forme `Bearer <jeton>` : le jeton est transmis tel quel à Core API (simulée). */
 export const bearer = (token = 'session-anne') => `Bearer ${token}`;
 
 /**
- * Cibles Core des adaptateurs de préférences (src/routes/settings.ts). Aucune n'existe dans Core API 1.1.1 ni dans
+ * Cibles Core des adaptateurs de préférences (src/routes/settings.ts). Aucune n'existe dans Core API 1.2.0 ni dans
  * son contrat publié : le BFF doit relayer le 404. upstream-contracts.test.ts vérifie qu'elles restent absentes ;
  * quand il échoue, Core les expose et les tests de préférences doivent mocker la vraie opération.
  */
