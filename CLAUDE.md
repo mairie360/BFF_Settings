@@ -107,7 +107,8 @@ Mirrors the Calendar BFF / APIs pattern: two standalone Compose stacks driven by
 return the tool's exit code (`docker-compose-{performance,security}.yml`, `performance_test.sh`,
 `security_test.sh`). Both bring up `database` + `liquibase-migrations` + `seeder` (`init-test.sql`,
 user id 2) + `redis` + `core-api` (probed by a curl sidecar — the published image is distroless) +
-the BFF built from `development.Dockerfile`.
+the BFF image named by `IMAGE_REF` (in CI, the image published by `release-dev`; locally,
+`bff-settings:local`, built by the scripts from `development.Dockerfile` when `IMAGE_REF` is empty).
 
 - **Performance** — k6 (`load-test.js`) hits `/health` and the authenticated `/settings/bootstrap`,
   minting an HS256 JWT (`sub=2`) with the same secret as `core-api` (`b"secret"`). Thresholds:
