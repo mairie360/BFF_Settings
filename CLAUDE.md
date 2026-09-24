@@ -110,9 +110,13 @@ user id 2) + `redis` + `core-api` (probed by a curl sidecar — the published im
 the BFF image named by `IMAGE_REF` (in CI, the image published by `release-dev`; locally,
 `bff-settings:local`, built by the scripts from `development.Dockerfile` when `IMAGE_REF` is empty).
 
-- **Performance** — k6 (`load-test.js`) hits `/health` and the authenticated `/settings/bootstrap`,
-  minting an HS256 JWT (`sub=2`) with the same secret as `core-api` (`b"secret"`). Thresholds:
-  `http_req_failed < 1%`, health p95 < 50 ms, settings p95 < 400 ms.
+- **Performance** — k6 (`load-test.js`) has one handler per operation of the contract, minting an
+  HS256 JWT (`sub=2`) with the same secret as `core-api` (`b"secret"`). Scenarios: `crud` (2 VUs) runs
+  every handler through `coverage.run()` (writes included, the profile patch restores the seed) and
+  carries the coverage gate; `reads` (ramp to 20 VUs) replays the GET handlers. Thresholds: one
+  `p(95)` per operation by family (`/health` 50 ms, `/check_apis` 150 ms, reads 400 ms, writes
+  800 ms), `http_req_failed < 1%`, `checks > 99%`. The three preference PATCHes accept their
+  documented 404 until Core API publishes preferences.
 - **Security** — OWASP ZAP imports `/openapi.json`, replays every operation with a static JWT via a
   header replacer, and fails on any alert not downgraded to `IGNORE` in `.zap/rules.tsv`. Expect one
   round of `rules.tsv` tuning after the first real run.
@@ -126,8 +130,8 @@ scan will surface it — fix or triage rather than blanket-ignoring.
 the pinned `cicd_version` (`CICD_VERSION=<branch>` overrides it). ZAP runs its `zap_hooks.py` with
 `--hook`: every operation of the served spec must be reached, and non-public ones with a
 non-401/403 answer. The spec requires `bearerAuth` at the top level (`openapi.ts`); `/health` and
-`/check_apis` set `security: []`. The k6 half (`coverage.js`, one handler per operation in
-`load-test.js`) is MAIR-196.
+`/check_apis` set `security: []`. k6 imports `coverage.js`: a new route without a handler in
+`load-test.js` makes k6 abort at init, so **adding a route means adding its handler**.
 
 ## Gotchas
 
