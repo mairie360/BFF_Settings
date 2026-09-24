@@ -512,17 +512,29 @@ export interface components {
             };
         };
         SettingsProfile: {
+            /** @example Security */
             first_name: string;
+            /** @example Admin */
             last_name: string;
-            /** Format: email */
+            /**
+             * Format: email
+             * @example security-admin@mairie360.fr
+             */
             email: string;
+            /** @example 0612345678 */
             phone?: string | null;
         };
         SettingsProfilePatch: {
+            /** @example Security */
             first_name?: string;
+            /** @example Admin */
             last_name?: string;
-            /** Format: email */
+            /**
+             * Format: email
+             * @example security-admin@mairie360.fr
+             */
             email?: string;
+            /** @example 0612345678 */
             phone?: string | null;
         };
         SettingsBootstrap: {
