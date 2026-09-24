@@ -17,10 +17,28 @@ const router = Router();
 router.use((req, res, next) => {
   try { authorization(req); next(); } catch (error) { routeError(res, error); }
 });
+// The examples are valid values, so a generated request (Swagger UI, ZAP) is accepted.
 export const ProfileSchema = registry.register('SettingsProfile', z.object({
-  first_name: z.string(), last_name: z.string(), email: z.string().email(), phone: z.string().nullable().optional(),
+  first_name: z.string().openapi({ example: 'Security' }),
+  last_name: z.string().openapi({ example: 'Admin' }),
+  email: z.string().email().openapi({ example: 'security-admin@mairie360.fr' }),
+  phone: z.string().nullable().optional().openapi({ example: '0612345678' }),
 }));
-export const ProfilePatchSchema = registry.register('SettingsProfilePatch', ProfileSchema.partial().strict());
+// Edits follow the database columns (names up to 64 characters, phone up to 15): a longer value made
+// Core API 1.2.0 fail with a 500. Names are rendered by the fronts, so `<`
+// and `>` are refused.
+const PersonName = z.string().trim().min(1).max(64).regex(/^[^<>]*$/, 'Must not contain < or >');
+export const ProfilePatchSchema = registry.register('SettingsProfilePatch', z.object({
+  first_name: PersonName.openapi({ example: 'Security' }),
+  last_name: PersonName.openapi({ example: 'Admin' }),
+  email: z.string().trim().email().max(320).openapi({ example: 'security-admin@mairie360.fr' }),
+  // Separators typed in the form (spaces, dots, dashes) are accepted and dropped before Core API;
+  // an empty value is kept as is.
+  phone: z.string()
+    .regex(/^(?:\+?\d(?:[\s.-]?\d){9,13})?$/, 'Expected 10 to 14 digits, optionally after a +')
+    .nullable()
+    .openapi({ example: '0612345678' }),
+}).partial().strict());
 const SessionSchema = z.object({
   id: z.string(), device_info: z.string(), ip_address: z.string(), created_at: z.string(), expires_at: z.string(), revoked_at: z.string().nullable().optional(),
 });
@@ -52,7 +70,10 @@ router.patch('/profile', async (req, res) => {
   const body = ProfilePatchSchema.safeParse(req.body);
   if (!body.success || !Object.keys(body.data).length) return res.status(400).json({ error: { message: 'Les champs autorisés sont prénom, nom, e-mail et téléphone.' } });
   try {
-    await coreApi.patchMe(body.data, asCaller(req));
+    const patch = typeof body.data.phone === 'string'
+      ? { ...body.data, phone: body.data.phone.replace(/[\s.-]/g, '') }
+      : body.data;
+    await coreApi.patchMe(patch, asCaller(req));
     return res.json(ProfileSchema.parse((await coreApi.getMe(asCaller(req))).data));
   } catch (error) { return routeError(res, coreError(error)); }
 });
