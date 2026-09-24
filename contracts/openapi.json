@@ -4,7 +4,19 @@
     "title": "bff_settings",
     "version": "1.0.0"
   },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
   "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
     "schemas": {
       "Error": {
         "type": "object",
@@ -159,6 +171,7 @@
   "paths": {
     "/health": {
       "get": {
+        "security": [],
         "tags": [
           "Connectivity"
         ],
@@ -190,6 +203,7 @@
     },
     "/check_apis": {
       "get": {
+        "security": [],
         "responses": {
           "200": {
             "description": "Services disponibles",
