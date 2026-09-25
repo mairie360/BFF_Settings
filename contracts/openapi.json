@@ -29,20 +29,24 @@
         "type": "object",
         "properties": {
           "first_name": {
-            "type": "string"
+            "type": "string",
+            "example": "Security"
           },
           "last_name": {
-            "type": "string"
+            "type": "string",
+            "example": "Admin"
           },
           "email": {
             "type": "string",
-            "format": "email"
+            "format": "email",
+            "example": "security-admin@mairie360.fr"
           },
           "phone": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "example": "0612345678"
           }
         },
         "required": [
@@ -55,20 +59,32 @@
         "type": "object",
         "properties": {
           "first_name": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[^<>]*$",
+            "example": "Security"
           },
           "last_name": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[^<>]*$",
+            "example": "Admin"
           },
           "email": {
             "type": "string",
-            "format": "email"
+            "maxLength": 320,
+            "format": "email",
+            "example": "security-admin@mairie360.fr"
           },
           "phone": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "pattern": "^(?:\\+?\\d(?:[\\s.-]?\\d){9,13})?$",
+            "example": "0612345678"
           }
         },
         "additionalProperties": false
