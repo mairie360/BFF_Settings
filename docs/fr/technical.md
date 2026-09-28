@@ -97,6 +97,8 @@ Le fichier `cicd.yml` appelle le workflow partagé `mairie360/CICD` `BFFs-cicd.y
 
 Le Dockerfile utilise `node:24-alpine` pour la construction et l’exécution; la commande de l’image est `["node", "dist/index.js"]`. Les identifiants GitHub Packages ne sont montés qu’en secrets BuildKit (`npmrc`, `node_auth_token`) pendant `npm ci`.
 
+`security_test.sh` lance la stack OWASP ZAP de `docker-compose-security.yml`: ZAP rejoue chaque opération de `/openapi.json` avec un JWT admin statique (`sub=1`, HS256, `JWT_SECRET=b"secret"`) et remplit les corps avec les exemples du contrat; `init-test.sql` crée les utilisateurs 1 (Admin) et 2 (User). `PATCH /settings/profile` respecte les colonnes de la base avant d’appeler Core: noms de 1 à 64 caractères sans `<` ni `>`, e-mail de 320 caractères au plus, et téléphone de 10 à 14 chiffres, éventuellement précédés d’un `+` (espaces, points et tirets sont retirés; une valeur vide est conservée).
+
 Avant un lancement Docker, vérifier les variables de service, les secrets de build et les réseaux dans les fichiers du dépôt. Une CI verte valide ses jobs; elle ne prouve pas la disponibilité des services métier dans un environnement distant.
 
 ## Diagnostic

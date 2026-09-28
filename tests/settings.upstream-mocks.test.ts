@@ -243,6 +243,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
     test.each([
       ['a single field', patchMe({ last_name: 'Le Gall-Martin' }), meResponse({ last_name: 'Le Gall-Martin' })],
       ['a phone removal', patchMe({ phone: null }), meResponse({ phone: null })],
+      ['an empty phone', patchMe({ phone: '' }), meResponse({ phone: '' })],
     ])('forwards only %s', async (_label, patch, persisted) => {
       coreApi.on('patch', CORE.me, { status: 200 }).on('get', CORE.me, { body: persisted });
 
@@ -253,12 +254,26 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(coreApi.calls(CORE.me, 'patch')[0].body).toEqual(patch);
     });
 
+    test('drops the separators of a phone typed with spaces before Core API', async () => {
+      const persisted = meResponse({ phone: '0612345678' });
+      coreApi.on('patch', CORE.me, { status: 200 }).on('get', CORE.me, { body: persisted });
+
+      const response = await withSession(request(app).patch('/settings/profile').send({ phone: '06 12 34.56-78' }));
+
+      expect(response.status).toBe(200);
+      expect(coreApi.calls(CORE.me, 'patch')[0].body).toEqual({ phone: '0612345678' });
+    });
+
     test.each([
       ['an empty body', {}],
       ['unsupported fields', { fullName: 'Anne Marie Le Gall', roles: ['Admin'] }],
       ['a known field mixed with an unsupported one', { first_name: 'Anne', status: 'archived' }],
       ['an invalid e-mail', { email: 'anne-at-mairie' }],
       ['a wrong type', { first_name: 42 }],
+      ['a name longer than its column', { last_name: 'x'.repeat(65) }],
+      ['markup in a name', { first_name: '<script>alert(1)</script>' }],
+      ['a phone that is not a number', { phone: '../../etc/passwd' }],
+      ['a phone longer than its column', { phone: '+3312345678901234' }],
       ['a JSON array', [{ first_name: 'Anne' }]],
     ])('rejects %s with 400 without calling Core', async (_label, body) => {
       const response = await withSession(request(app).patch('/settings/profile').send(body));

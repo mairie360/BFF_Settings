@@ -97,6 +97,8 @@ The `cicd.yml` file calls the shared `mairie360/CICD` `BFFs-cicd.yml@v2.3.0` wor
 
 The Dockerfile uses `node:24-alpine` for build and runtime; the image command is `["node", "dist/index.js"]`. GitHub Packages credentials are only mounted as BuildKit secrets (`npmrc`, `node_auth_token`) during `npm ci`.
 
+`security_test.sh` runs the OWASP ZAP stack of `docker-compose-security.yml`: ZAP replays every operation of `/openapi.json` with a static admin JWT (`sub=1`, HS256, `JWT_SECRET=b"secret"`) and fills bodies from the contract examples; `init-test.sql` seeds users 1 (Admin) and 2 (User). `PATCH /settings/profile` follows the database columns before calling Core: names of 1 to 64 characters without `<` or `>`, an e-mail of at most 320 characters, and a phone of 10 to 14 digits, optionally after a `+` (spaces, dots and dashes are dropped; an empty value is kept).
+
 Before running Docker, check service variables, build secrets and networks in the repository files. Green CI validates its jobs; it does not prove business-service availability in a remote environment.
 
 ## Troubleshooting
