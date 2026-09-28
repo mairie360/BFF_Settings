@@ -120,6 +120,15 @@ the BFF image named by `IMAGE_REF` (in CI, the image published by `release-dev`;
 `rules.tsv` neutralises informational alerts only; if `core-api` responds 5xx on a half-wired route the
 scan will surface it — fix or triage rather than blanket-ignoring.
 
+## ZAP OpenAPI coverage gate
+
+`security_test.sh` / `performance_test.sh` clone `mairie360/CICD` into `cicd-repo/` (gitignored) at
+the pinned `cicd_version` (`CICD_VERSION=<branch>` overrides it). ZAP runs its `zap_hooks.py` with
+`--hook`: every operation of the served spec must be reached, and non-public ones with a
+non-401/403 answer. The spec requires `bearerAuth` at the top level (`openapi.ts`); `/health` and
+`/check_apis` set `security: []`. The k6 half (`coverage.js`, one handler per operation in
+`load-test.js`) is MAIR-196.
+
 ## Gotchas
 
 - **ESLint** uses only the flat `eslint.config.cjs` (the legacy `.eslintrc.js` was removed, like in the

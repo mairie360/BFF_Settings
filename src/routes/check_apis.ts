@@ -5,7 +5,7 @@ import { coreApi, withoutSession } from '../clients/coreClient';
 
 const router = Router();
 const CheckApisSchema = z.object({ status: z.string() }).catchall(z.string());
-registry.registerPath({ method: 'get', path: '/check_apis', responses: {
+registry.registerPath({ method: 'get', path: '/check_apis', security: [], responses: {
   200: { description: 'Services disponibles', content: { 'application/json': { schema: CheckApisSchema } } },
   502: { description: 'Service indisponible', content: { 'application/json': { schema: CheckApisSchema } } },
 } });
