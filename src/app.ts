@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import { openApiDocument } from './openapi';
 import healthRouter from './routes/health';
@@ -7,22 +8,18 @@ import checkApis from './routes/check_apis';
 import moduleRouter from './routes/settings';
 
 export const app = express();
-app.disable('x-powered-by');
-
-// API-only surface: no embedded content, so a hard default-src covers every route below.
-// Runs first (before body parsing) so it also covers body-parse error responses; /docs opts out.
-app.use((req, res, next) => {
-  if (!req.path.startsWith('/docs')) {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Content-Security-Policy', "default-src 'none'");
-    res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
-    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
-  }
-  next();
-});
+// Security headers (CSP, X-Content-Type-Options, Permissions-Policy, CORP...) and removal of
+// X-Powered-By, same configuration as BFF User. Runs first (before body parsing) so it also covers
+// body-parse error responses. upgrade-insecure-requests is dropped because the BFF is served over
+// HTTP behind the reverse proxy.
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: { 'upgrade-insecure-requests': null },
+  },
+}));
 
 app.use(express.json());
-app.use(express.raw({ type: 'multipart/form-data', limit: '20mb' }));
 
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiDocument));
 app.get(['/openapi.json', '/swagger.json'], (_req, res) => res.json(openApiDocument));
