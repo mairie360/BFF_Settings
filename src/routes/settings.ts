@@ -1,21 +1,24 @@
+import { HttpError } from '@mairie360/bffs-lib';
 import { Router } from 'express';
 import { z } from 'zod';
 import { registry, ErrorSchema } from '../openapi-registry';
 import { asCaller, coreApi, coreError } from '../clients/coreClient';
-import { authorization, routeError } from '../clients/upstream';
+import { authorization } from '../clients/upstream';
 
 const errorContent = { content: { 'application/json': { schema: ErrorSchema } } };
 const passthroughContent = { content: { 'application/json': { schema: z.record(z.string(), z.unknown()) } } };
-// Réponses d'erreur communes : session refusée (BFF ou Core), panne Core (réseau ou 5xx), Core non configuré.
+// Common error answers: session refused (BFF or Core), Core failure (network, 5xx, undeclared 4xx or
+// invalid answer), Core not configured.
 const upstreamErrors = {
-  401: { description: 'Session invalide', ...errorContent },
-  502: { description: 'Core indisponible', ...errorContent },
-  503: { description: 'Core non configuré', ...errorContent },
+  401: { description: 'Invalid session', ...errorContent },
+  502: { description: 'Core is unavailable, failed or answered an unexpected status', ...errorContent },
+  503: { description: 'Core is not configured', ...errorContent },
 };
 
 const router = Router();
-router.use((req, res, next) => {
-  try { authorization(req); next(); } catch (error) { routeError(res, error); }
+router.use((req, _res, next) => {
+  authorization(req);
+  next();
 });
 // The examples are valid values, so a generated request (Swagger UI, ZAP) is accepted.
 export const ProfileSchema = registry.register('SettingsProfile', z.object({
@@ -47,8 +50,8 @@ export const BootstrapSchema = registry.register('SettingsBootstrap', z.object({
   sources: z.object({ sessions: z.enum(['available', 'unavailable']) }),
 }));
 registry.registerPath({ method: 'get', path: '/settings/bootstrap', responses: {
-  200: { description: 'Profil et sessions Core de l’utilisateur connecté', content: { 'application/json': { schema: BootstrapSchema } } },
-  ...upstreamErrors, 502: { description: 'Profil indisponible', ...errorContent },
+  200: { description: 'Core profile and sessions of the signed-in user', content: { 'application/json': { schema: BootstrapSchema } } },
+  ...upstreamErrors, 502: { description: 'Profile unavailable', ...errorContent },
 } });
 router.get('/bootstrap', async (req, res) => {
   try {
@@ -61,37 +64,41 @@ router.get('/bootstrap', async (req, res) => {
       sessionSource = 'available';
     } catch { /* Session availability is separate from profile availability. */ }
     return res.json(BootstrapSchema.parse({ profile, sessions, sources: { sessions: sessionSource } }));
-  } catch (error) { return routeError(res, coreError(error)); }
+  } catch (error) { throw coreError(error, [401]); }
 });
 registry.registerPath({ method: 'patch', path: '/settings/profile', request: {
   body: { required: true, content: { 'application/json': { schema: ProfilePatchSchema } } },
-}, responses: { 200: { description: 'Profil sauvegardé puis relu', content: { 'application/json': { schema: ProfileSchema } } }, 400: { description: 'Champs invalides ou non pris en charge', ...errorContent }, ...upstreamErrors } });
+}, responses: { 200: { description: 'Profile saved, then read again', content: { 'application/json': { schema: ProfileSchema } } }, 400: { description: 'Invalid or unsupported fields', ...errorContent }, ...upstreamErrors } });
 router.patch('/profile', async (req, res) => {
   const body = ProfilePatchSchema.safeParse(req.body);
-  if (!body.success || !Object.keys(body.data).length) return res.status(400).json({ error: { message: 'Les champs autorisés sont prénom, nom, e-mail et téléphone.' } });
+  if (!body.success || !Object.keys(body.data).length) {
+    throw new HttpError(400, 'The allowed fields are first name, last name, e-mail and phone.', {
+      details: body.success ? [] : body.error.issues.map((issue) => ({ path: ['body', ...issue.path].join('.'), message: issue.message })),
+    });
+  }
   try {
     const patch = typeof body.data.phone === 'string'
       ? { ...body.data, phone: body.data.phone.replace(/[\s.-]/g, '') }
       : body.data;
     await coreApi.patchMe(patch, asCaller(req));
     return res.json(ProfileSchema.parse((await coreApi.getMe(asCaller(req))).data));
-  } catch (error) { return routeError(res, coreError(error)); }
+  } catch (error) { throw coreError(error, [400, 401]); }
 });
 
-// Core API n'expose aucune opération de préférences : ces sections répondent 404 et ne simulent jamais
-// une sauvegarde locale. Elles relaieront Core dès qu'il publiera les opérations correspondantes.
+// Core API exposes no preference operation: these sections answer 404 and never fake a local save.
+// They will relay Core as soon as it publishes the matching operations.
 const preferences = ['notifications', 'appearance', 'general'] as const;
 for (const section of preferences) {
   registry.registerPath({ method: 'patch', path: `/settings/${section}`, request: {
     body: { required: true, content: { 'application/json': { schema: z.record(z.string(), z.unknown()) } } },
   }, responses: {
-    200: { description: 'Préférences enregistrées par Core', ...passthroughContent },
-    400: { description: 'Corps de requête invalide', ...errorContent },
-    404: { description: 'Fonction non disponible dans Core', ...passthroughContent },
+    200: { description: 'Preferences saved by Core', ...passthroughContent },
+    400: { description: 'Unparsable request body', ...errorContent },
+    404: { description: 'Not available in Core yet', ...errorContent },
     ...upstreamErrors,
   } });
-  router.patch(`/${section}`, (_req, res) => res.status(404).json({
-    error: { message: 'Cette préférence n’est pas encore gérée par Core API.' },
-  }));
+  router.patch(`/${section}`, () => {
+    throw new HttpError(404, 'This preference is not handled by Core API yet.');
+  });
 }
 export default router;

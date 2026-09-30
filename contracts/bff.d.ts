@@ -111,7 +111,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Profil et sessions Core de l’utilisateur connecté */
+                /** @description Core profile and sessions of the signed-in user */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -120,31 +120,31 @@ export interface paths {
                         "application/json": components["schemas"]["SettingsBootstrap"];
                     };
                 };
-                /** @description Session invalide */
+                /** @description Invalid session */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Profil indisponible */
+                /** @description Profile unavailable */
                 502: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core non configuré */
+                /** @description Core is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
             };
@@ -183,7 +183,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Profil sauvegardé puis relu */
+                /** @description Profile saved, then read again */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -192,40 +192,40 @@ export interface paths {
                         "application/json": components["schemas"]["SettingsProfile"];
                     };
                 };
-                /** @description Champs invalides ou non pris en charge */
+                /** @description Invalid or unsupported fields */
                 400: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Session invalide */
+                /** @description Invalid session */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core indisponible */
+                /** @description Core is unavailable, failed or answered an unexpected status */
                 502: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core non configuré */
+                /** @description Core is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
             };
@@ -260,7 +260,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Préférences enregistrées par Core */
+                /** @description Preferences saved by Core */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -271,51 +271,49 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Corps de requête invalide */
+                /** @description Unparsable request body */
                 400: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Session invalide */
+                /** @description Invalid session */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Fonction non disponible dans Core */
+                /** @description Not available in Core yet */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core indisponible */
+                /** @description Core is unavailable, failed or answered an unexpected status */
                 502: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core non configuré */
+                /** @description Core is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
             };
@@ -350,7 +348,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Préférences enregistrées par Core */
+                /** @description Preferences saved by Core */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -361,51 +359,49 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Corps de requête invalide */
+                /** @description Unparsable request body */
                 400: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Session invalide */
+                /** @description Invalid session */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Fonction non disponible dans Core */
+                /** @description Not available in Core yet */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core indisponible */
+                /** @description Core is unavailable, failed or answered an unexpected status */
                 502: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core non configuré */
+                /** @description Core is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
             };
@@ -440,7 +436,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Préférences enregistrées par Core */
+                /** @description Preferences saved by Core */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -451,51 +447,49 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Corps de requête invalide */
+                /** @description Unparsable request body */
                 400: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Session invalide */
+                /** @description Invalid session */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Fonction non disponible dans Core */
+                /** @description Not available in Core yet */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core indisponible */
+                /** @description Core is unavailable, failed or answered an unexpected status */
                 502: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core non configuré */
+                /** @description Core is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
             };
@@ -506,9 +500,15 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        Error: {
+        ErrorResponse: {
             error: {
+                /** @enum {string} */
+                code: "BAD_REQUEST" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNPROCESSABLE_ENTITY" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "BAD_GATEWAY" | "SERVICE_UNAVAILABLE" | "GATEWAY_TIMEOUT";
                 message: string;
+                details: {
+                    path?: string;
+                    message: string;
+                }[];
             };
         };
         SettingsProfile: {

@@ -38,18 +38,18 @@ schema — CI (`contracts:check`) and a jest test both fail otherwise. See "Cont
 `/settings`). Every `/settings` request passes through Bearer auth middleware and gets
 `Cache-Control: no-store`.
 
-**`src/clients/upstream.ts` is the core abstraction** — all upstream I/O goes through it:
-- `authorization(req)` — requires `Authorization: Bearer <token>`, throws `UpstreamError(401)`.
-- `baseUrl(service)` — resolves the target from env vars `<SERVICE>_URL` (+ optional `<SERVICE>_PORT`),
-  e.g. `CORE_API_URL`. Missing config -> `UpstreamError(503)`.
-- `json(req, service, path, init)` — typed JSON call; keeps upstream 4xx, maps 5xx and network errors to
-  `UpstreamError(502)`. An empty 2xx body returns `undefined` (Core answers `PATCH /api/v1/user/me/` with an
-  empty 200, not a 204).
-- `forward(req, res, service, path)` — transparent proxy that preserves method, body (incl. binary /
-  multipart), 2xx–4xx status, and a whitelist of response headers; an upstream 5xx becomes a 502 without
-  its body. Used by the preference adapters.
-- `routeError(res, err)` — the single error response shape: `{ error: { message } }`, status from
-  `UpstreamError.status` or 502.
+**Errors (`@mairie360/bffs-lib`).** Every error body is `{ error: { code, message, details } }`, the
+`ErrorResponse` schema (`src/openapi-registry.ts`, the lib's `ErrorResponseSchema.clone()`). Routes throw
+`HttpError`; `app.ts` ends with the lib's `notFoundHandler` and `errorHandler()`, which keep the status
+(400 for an unparsable body) and turn anything unexpected into a generic 500.
+
+**`src/clients/`:**
+- `upstream.ts`: `authorization(req)` requires `Authorization: Bearer <token>` (`HttpError(401)`);
+  `baseUrl(service)` resolves `<SERVICE>_URL` (+ optional `<SERVICE>_PORT`), `HttpError(503)` when missing.
+- `coreClient.ts`: the generated Core client (`coreApi`, `asCaller(req)`, `withoutSession()`) and
+  `coreError(error, declared)`: only the Core 4xx listed in `declared` (the statuses the route's contract
+  declares) are kept; any other status, a network failure or an invalid answer (ZodError) becomes a 502.
+  The Core body is never relayed.
 
 **Routes:**
 - `routes/health.ts` — liveness only (`{ status: 'ok' }`), no upstream call.
@@ -61,9 +61,8 @@ schema — CI (`contracts:check`) and a jest test both fail otherwise. See "Cont
   - `PATCH /settings/profile` validates against `ProfilePatchSchema` (`.strict()` — unknown fields
     and empty bodies are 400, never a silent success), PATCHes Core, then **re-reads** and returns the
     persisted profile.
-  - `PATCH /settings/{notifications,appearance,general}` are pass-through adapters via `forward()` —
-    they preserve Core's status (including 404: Core 1.1.1 serves neither `notification-settings/` nor
-    `preferences/`) and never fabricate a local save.
+  - `PATCH /settings/{notifications,appearance,general}` answer 404 without calling Core (Core serves
+    neither `notification-settings/` nor `preferences/`) and never fabricate a local save.
   - Every `/settings` route documents 401/502/503 through `upstreamErrors`; the contract tests fail on
     any status the route can return but does not declare.
 

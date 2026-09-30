@@ -78,7 +78,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
 
       expect(response.status).toBe(401);
       expectBffContract(route.method, route.path, response);
-      expect(response.body).toEqual({ error: { message: 'Session invalide.' } });
+      expect(response.body).toEqual({ error: { code: 'UNAUTHORIZED', message: 'Invalid session.', details: [] } });
       expect(response.headers['cache-control']).toBe('no-store');
       expect(coreApi.requests).toHaveLength(0);
     });
@@ -90,7 +90,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
 
       expect(response.status).toBe(503);
       expectBffContract(route.method, route.path, response);
-      expect(response.body).toEqual({ error: { message: 'Le service CORE_API n’est pas configuré.' } });
+      expect(response.body).toEqual({ error: { code: 'SERVICE_UNAVAILABLE', message: 'The CORE_API service is not configured.', details: [] } });
     });
 
     test.each(BFF_ROUTES)('$method $path answers 502 when Core API is unreachable', async (route) => {
@@ -100,7 +100,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
 
       expect(response.status).toBe(502);
       expectBffContract(route.method, route.path, response);
-      expect(response.body).toEqual({ error: { message: 'Le service CORE_API est indisponible.' } });
+      expect(response.body).toEqual({ error: { code: 'BAD_GATEWAY', message: 'The CORE_API service is unavailable.', details: [] } });
     });
   });
 
@@ -181,15 +181,25 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
 
       expect(response.status).toBe(401);
       expectBffContract('get', '/settings/bootstrap', response);
-      expect(response.body).toEqual({ error: { message: 'Le service CORE_API a répondu 401.' } });
+      expect(response.body).toEqual({ error: { code: 'UNAUTHORIZED', message: 'Authentication required', details: [] } });
       expect(coreApi.calls(CORE.sessions)).toHaveLength(0);
     });
 
+    test.each([403, 404, 409])('turns an undeclared Core %i on the profile into a 502', async (status) => {
+      coreApi.on('get', CORE.me, coreError(status, 'Forbidden'));
+
+      const response = await withSession(request(app).get('/settings/bootstrap'));
+
+      expect(response.status).toBe(502);
+      expectBffContract('get', '/settings/bootstrap', response);
+      expect(response.body).toEqual({ error: { code: 'BAD_GATEWAY', message: 'Upstream service error', details: [] } });
+    });
+
     test.each<[string, MockReply, string]>([
-      ['a Core 500', coreError(500), 'Le service CORE_API a répondu 500.'],
-      ['a Core 503', coreError(503, 'Service Unavailable'), 'Le service CORE_API a répondu 503.'],
-      ['invalid JSON', { raw: '<html>proxy</html>', contentType: 'text/html', outOfContract: true }, 'La réponse de CORE_API est invalide.'],
-      ['a dropped connection', { dropConnection: true }, 'Le service CORE_API est indisponible.'],
+      ['a Core 500', coreError(500), 'Upstream service error'],
+      ['a Core 503', coreError(503, 'Service Unavailable'), 'Upstream service error'],
+      ['invalid JSON', { raw: '<html>proxy</html>', contentType: 'text/html', outOfContract: true }, 'The CORE_API answer is invalid.'],
+      ['a dropped connection', { dropConnection: true }, 'The CORE_API service is unavailable.'],
     ])('maps %s on the profile to 502 without leaking the upstream body', async (_label, reply, message) => {
       coreApi.on('get', CORE.me, reply);
 
@@ -197,7 +207,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
 
       expect(response.status).toBe(502);
       expectBffContract('get', '/settings/bootstrap', response);
-      expect(response.body).toEqual({ error: { message } });
+      expect(response.body).toEqual({ error: { code: 'BAD_GATEWAY', message, details: [] } });
       expect(JSON.stringify(response.body)).not.toMatch(/database|proxy/);
       expect(coreApi.calls(CORE.sessions)).toHaveLength(0);
     });
@@ -209,7 +219,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
 
       expect(response.status).toBe(502);
       expectBffContract('get', '/settings/bootstrap', response);
-      expect(response.body).toEqual({ error: { message: 'La réponse de CORE_API est invalide.' } });
+      expect(response.body).toEqual({ error: { code: 'BAD_GATEWAY', message: 'The CORE_API answer is invalid.', details: [] } });
     });
   });
 
@@ -280,8 +290,26 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
 
       expect(response.status).toBe(400);
       expectBffContract('patch', '/settings/profile', response);
-      expect(response.body).toEqual({ error: { message: 'Les champs autorisés sont prénom, nom, e-mail et téléphone.' } });
+      expect(response.body.error).toMatchObject({ code: 'BAD_REQUEST', message: 'The allowed fields are first name, last name, e-mail and phone.' });
+      expect(Array.isArray(response.body.error.details)).toBe(true);
       expect(coreApi.requests).toHaveLength(0);
+    });
+
+    test('lists the invalid fields in details', async () => {
+      const response = await withSession(request(app).patch('/settings/profile').send({ email: 'anne-at-mairie', status: 'archived' }));
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.details).toEqual(expect.arrayContaining([
+        expect.objectContaining({ path: 'body.email' }),
+        expect.objectContaining({ path: 'body' }),
+      ]));
+    });
+
+    test('answers an empty body with no details', async () => {
+      const response = await withSession(request(app).patch('/settings/profile').send({}));
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.details).toEqual([]);
     });
 
     test('rejects a malformed JSON body with 400', async () => {
@@ -289,22 +317,24 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
 
       expect(response.status).toBe(400);
       expectBffContract('patch', '/settings/profile', response);
-      expect(response.body).toEqual({ error: { message: 'Corps de requête invalide.' } });
+      expect(response.body).toEqual({ error: { code: 'BAD_REQUEST', message: 'Invalid request', details: [] } });
       expect(coreApi.requests).toHaveLength(0);
     });
 
-    test.each<[string, MockReply, number]>([
-      ['a Core 401', coreError(401, ''), 401],
-      ['a Core 400', coreError(400, 'Json deserialize error'), 400],
-      ['a Core 500', coreError(500), 502],
-    ])('does not report a save and does not re-read on %s', async (_label, reply, status) => {
+    test.each<[string, MockReply, number, string, string]>([
+      ['a Core 401', coreError(401, ''), 401, 'UNAUTHORIZED', 'Authentication required'],
+      ['a Core 400', coreError(400, 'Json deserialize error'), 400, 'BAD_REQUEST', 'Invalid request'],
+      ['an undeclared Core 404', coreError(404, 'Not Found'), 502, 'BAD_GATEWAY', 'Upstream service error'],
+      ['an undeclared Core 409', coreError(409, 'Conflict'), 502, 'BAD_GATEWAY', 'Upstream service error'],
+      ['a Core 500', coreError(500), 502, 'BAD_GATEWAY', 'Upstream service error'],
+    ])('does not report a save and does not re-read on %s', async (_label, reply, status, code, message) => {
       coreApi.on('patch', CORE.me, reply);
 
       const response = await withSession(request(app).patch('/settings/profile').send({ first_name: 'Anne' }));
 
       expect(response.status).toBe(status);
       expectBffContract('patch', '/settings/profile', response);
-      expect(response.body).toEqual({ error: { message: `Le service CORE_API a répondu ${reply.status}.` } });
+      expect(response.body).toEqual({ error: { code, message, details: [] } });
       expect(coreApi.calls(CORE.me, 'get')).toHaveLength(0);
     });
 
@@ -315,7 +345,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
 
       expect(response.status).toBe(502);
       expectBffContract('patch', '/settings/profile', response);
-      expect(response.body).toEqual({ error: { message: 'Le service CORE_API a répondu 500.' } });
+      expect(response.body).toEqual({ error: { code: 'BAD_GATEWAY', message: 'Upstream service error', details: [] } });
     });
   });
 
@@ -327,7 +357,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expectBffContract('patch', `/settings/${section}`, response);
       expect(response.type).toBe('application/json');
       expect(response.headers['cache-control']).toBe('no-store');
-      expect(response.body).toEqual({ error: { message: 'Cette préférence n’est pas encore gérée par Core API.' } });
+      expect(response.body).toEqual({ error: { code: 'NOT_FOUND', message: 'This preference is not handled by Core API yet.', details: [] } });
       expect(coreApi.requests).toEqual([]);
     });
   });

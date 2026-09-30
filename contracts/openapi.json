@@ -18,18 +18,54 @@
       }
     },
     "schemas": {
-      "Error": {
+      "ErrorResponse": {
         "type": "object",
         "properties": {
           "error": {
             "type": "object",
             "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "BAD_REQUEST",
+                  "UNAUTHORIZED",
+                  "FORBIDDEN",
+                  "NOT_FOUND",
+                  "CONFLICT",
+                  "PAYLOAD_TOO_LARGE",
+                  "UNPROCESSABLE_ENTITY",
+                  "TOO_MANY_REQUESTS",
+                  "INTERNAL_ERROR",
+                  "BAD_GATEWAY",
+                  "SERVICE_UNAVAILABLE",
+                  "GATEWAY_TIMEOUT"
+                ]
+              },
               "message": {
                 "type": "string"
+              },
+              "details": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
               }
             },
             "required": [
-              "message"
+              "code",
+              "message",
+              "details"
             ]
           }
         },
@@ -254,7 +290,7 @@
       "get": {
         "responses": {
           "200": {
-            "description": "Profil et sessions Core de l’utilisateur connecté",
+            "description": "Core profile and sessions of the signed-in user",
             "content": {
               "application/json": {
                 "schema": {
@@ -264,31 +300,31 @@
             }
           },
           "401": {
-            "description": "Session invalide",
+            "description": "Invalid session",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "502": {
-            "description": "Profil indisponible",
+            "description": "Profile unavailable",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "503": {
-            "description": "Core non configuré",
+            "description": "Core is not configured",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -310,7 +346,7 @@
         },
         "responses": {
           "200": {
-            "description": "Profil sauvegardé puis relu",
+            "description": "Profile saved, then read again",
             "content": {
               "application/json": {
                 "schema": {
@@ -320,41 +356,41 @@
             }
           },
           "400": {
-            "description": "Champs invalides ou non pris en charge",
+            "description": "Invalid or unsupported fields",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "401": {
-            "description": "Session invalide",
+            "description": "Invalid session",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "502": {
-            "description": "Core indisponible",
+            "description": "Core is unavailable, failed or answered an unexpected status",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "503": {
-            "description": "Core non configuré",
+            "description": "Core is not configured",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -377,7 +413,7 @@
         },
         "responses": {
           "200": {
-            "description": "Préférences enregistrées par Core",
+            "description": "Preferences saved by Core",
             "content": {
               "application/json": {
                 "schema": {
@@ -388,52 +424,51 @@
             }
           },
           "400": {
-            "description": "Corps de requête invalide",
+            "description": "Unparsable request body",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "401": {
-            "description": "Session invalide",
+            "description": "Invalid session",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "404": {
-            "description": "Fonction non disponible dans Core",
+            "description": "Not available in Core yet",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {}
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "502": {
-            "description": "Core indisponible",
+            "description": "Core is unavailable, failed or answered an unexpected status",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "503": {
-            "description": "Core non configuré",
+            "description": "Core is not configured",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -456,7 +491,7 @@
         },
         "responses": {
           "200": {
-            "description": "Préférences enregistrées par Core",
+            "description": "Preferences saved by Core",
             "content": {
               "application/json": {
                 "schema": {
@@ -467,52 +502,51 @@
             }
           },
           "400": {
-            "description": "Corps de requête invalide",
+            "description": "Unparsable request body",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "401": {
-            "description": "Session invalide",
+            "description": "Invalid session",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "404": {
-            "description": "Fonction non disponible dans Core",
+            "description": "Not available in Core yet",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {}
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "502": {
-            "description": "Core indisponible",
+            "description": "Core is unavailable, failed or answered an unexpected status",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "503": {
-            "description": "Core non configuré",
+            "description": "Core is not configured",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -535,7 +569,7 @@
         },
         "responses": {
           "200": {
-            "description": "Préférences enregistrées par Core",
+            "description": "Preferences saved by Core",
             "content": {
               "application/json": {
                 "schema": {
@@ -546,52 +580,51 @@
             }
           },
           "400": {
-            "description": "Corps de requête invalide",
+            "description": "Unparsable request body",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "401": {
-            "description": "Session invalide",
+            "description": "Invalid session",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "404": {
-            "description": "Fonction non disponible dans Core",
+            "description": "Not available in Core yet",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {}
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "502": {
-            "description": "Core indisponible",
+            "description": "Core is unavailable, failed or answered an unexpected status",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "503": {
-            "description": "Core non configuré",
+            "description": "Core is not configured",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }

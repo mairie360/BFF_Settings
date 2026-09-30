@@ -1,6 +1,7 @@
 import request from 'supertest';
 import type { Express } from 'express';
 import app from '../src/app';
+import { ProfilePatchSchema } from '../src/routes/settings';
 
 describe('application-wide security middleware', () => {
   test.each(['/health', '/unknown-route'])('%s carries the helmet security headers and no X-Powered-By', async (pathname) => {
@@ -19,6 +20,36 @@ describe('application-wide security middleware', () => {
 
     expect(response.status).toBe(400);
     expect(response.headers['x-content-type-options']).toBe('nosniff');
+  });
+});
+
+describe('final handlers', () => {
+  test('an unknown route answers the 404 envelope', async () => {
+    const response = await request(app).get('/unknown-route');
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: { code: 'NOT_FOUND', message: 'Route not found', details: [] } });
+  });
+
+  test('an unparsable JSON body answers 400, not a flattened error', async () => {
+    const response = await request(app).patch('/settings/profile').set('Content-Type', 'application/json').send('{not json');
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: { code: 'BAD_REQUEST', message: 'Invalid request', details: [] } });
+  });
+
+  test('an unexpected error answers a generic 500 instead of 400, without its message', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const parseSpy = jest.spyOn(ProfilePatchSchema, 'safeParse').mockImplementation(() => { throw new Error('secret internal detail'); });
+
+    const response = await request(app).patch('/settings/profile').set('Authorization', 'Bearer test-session').send({ first_name: 'Anne' });
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error', details: [] } });
+    expect(JSON.stringify(response.body)).not.toContain('secret');
+    expect(errorSpy).toHaveBeenCalled();
+    parseSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 
   test('no raw multipart body parser buffers uploads in memory', () => {
