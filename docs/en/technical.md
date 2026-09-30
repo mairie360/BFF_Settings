@@ -71,7 +71,7 @@ Inventory extracted from `contracts/openapi.json`. Replace brace parameters with
 
 ## Session, permissions and errors
 
-All `/settings` routes require a Bearer token. Profile errors block bootstrap; session errors set `sources.sessions` to `unavailable`. Core calls have a 10-second timeout and business responses use `no-store`. Core 4xx statuses are preserved; a Core outage (network, timeout or 5xx) becomes 502 without relaying the upstream body, and an unconfigured Core becomes 503. A Core success without body (Core answers an empty 200 to `PATCH /api/v1/user/me/`) is accepted, then the profile is re-read.
+All `/settings` routes require a Bearer token. Profile errors block bootstrap; session errors set `sources.sessions` to `unavailable`. Core calls have a 10-second timeout and business responses use `no-store`. Every error is answered in the envelope shared by all the BFFs (`@mairie360/bffs-lib`), declared as `ErrorResponse` in the contract: `{ "error": { "code": "BAD_GATEWAY", "message": "...", "details": [] } }`. `code` follows the HTTP status; `details` lists the invalid fields of a PATCH 400 (`{ "path": "body.email", "message": "..." }`) and is empty otherwise. Only the Core 4xx a route declares are preserved (401 on bootstrap, 400 and 401 on the profile PATCH); any other Core status, a Core outage (network, timeout) or an invalid Core answer becomes 502 without relaying the upstream body, and an unconfigured Core becomes 503. Unknown routes answer 404, an unparsable JSON body 400 and an unexpected error a generic 500. A Core success without body (Core answers an empty 200 to `PATCH /api/v1/user/me/`) is accepted, then the profile is re-read.
 
 ## Synchronization and verification
 
