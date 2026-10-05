@@ -35,8 +35,9 @@ schema — CI (`contracts:check`) and a jest test both fail otherwise. See "Cont
 ## Architecture
 
 **Request flow:** `src/index.ts` -> `src/app.ts` mounts three routers (`/health`, `/check_apis`,
-`/settings`). Every `/settings` request passes through Bearer auth middleware and gets
-`Cache-Control: no-store`.
+`/settings`). Every `/settings` request goes through the lib's `noStore` (`Cache-Control: no-store`)
+and `requireBearer` (401 before any Core call without `Authorization: Bearer <token>`; cookies and
+`x-session-token` are ignored). `trust proxy` comes from `TRUST_PROXY` (lib `parseTrustProxy`).
 
 **Errors (`@mairie360/bffs-lib`).** Every error body is `{ error: { code, message, details } }`, the
 `ErrorResponse` schema (`src/openapi-registry.ts`, the lib's `ErrorResponseSchema.clone()`). Routes throw
@@ -44,9 +45,9 @@ schema — CI (`contracts:check`) and a jest test both fail otherwise. See "Cont
 (400 for an unparsable body) and turn anything unexpected into a generic 500.
 
 **`src/clients/`:**
-- `upstream.ts`: `authorization(req)` requires `Authorization: Bearer <token>` (`HttpError(401)`);
-  `baseUrl(service)` resolves `<SERVICE>_URL` (+ optional `<SERVICE>_PORT`), `HttpError(503)` when missing.
-- `coreClient.ts`: the generated Core client (`coreApi`, `asCaller(req)`, `withoutSession()`) and
+- `upstream.ts`: `baseUrl(service)` resolves `<SERVICE>_URL` (+ optional `<SERVICE>_PORT`), `HttpError(503)` when missing.
+- `coreClient.ts`: the generated Core client (`coreApi`, `asCaller(req)` with the lib's `authorization(req)`,
+  `withoutSession()`) and
   `coreError(error, declared)`: only the Core 4xx listed in `declared` (the statuses the route's contract
   declares) are kept; any other status, a network failure or an invalid answer (ZodError) becomes a 502.
   The Core body is never relayed.

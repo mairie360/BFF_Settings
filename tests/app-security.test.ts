@@ -52,6 +52,10 @@ describe('final handlers', () => {
     errorSpy.mockRestore();
   });
 
+  test('trusts no proxy unless TRUST_PROXY says so', () => {
+    expect(app.get('trust proxy')).toBe(false);
+  });
+
   test('no raw multipart body parser buffers uploads in memory', () => {
     const { router } = app as Express & { router: { stack: Array<{ name: string }> } };
 
