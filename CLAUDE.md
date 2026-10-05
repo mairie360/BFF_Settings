@@ -45,22 +45,30 @@ and `requireBearer` (401 before any Core call without `Authorization: Bearer <to
 (400 for an unparsable body) and turn anything unexpected into a generic 500.
 
 **`src/clients/`:**
-- `coreClient.ts`: the generated Core client (`coreApi`, `asCaller(req)` with the lib's `authorization(req)`,
-  `withoutSession()`; the base URL comes from the lib's `baseUrl('CORE_API')` on every call:
-  `CORE_API_URL` + optional `CORE_API_PORT`, `HttpError(503)` when missing, no `localhost` default) and
-  `coreError(error, declared)`: only the Core 4xx listed in `declared` (the statuses the route's contract
-  declares) are kept; any other status, a network failure or an invalid answer (ZodError) becomes a 502.
-  The Core body is never relayed.
+- `coreClient.ts`: only the generated Core client `coreApi` (axios instance with `Accept: application/json`,
+  no `baseURL`). Every call passes the lib's `asCaller('CORE_API', req)` (401 without a Bearer token, then
+  `baseUrl('CORE_API')`: `CORE_API_URL` + optional `CORE_API_PORT`, 503 when missing, no `localhost`
+  default, 10 s timeout) or `withoutSession('CORE_API', 5_000)` for the probe.
+- Failures go through the lib's `callUpstream('CORE_API', call, { declared, retry })`: only the Core 4xx listed
+  in `declared` (the statuses the route's contract declares) are kept; any other status, no answer
+  (`The CORE_API service is unavailable.`) or an invalid answer parsed inside the call (`The CORE_API answer
+  is invalid.`) becomes a 502. The Core body is never relayed. `retry: true` (one retry on no answer /
+  502 / 503 / 504) is set on the Core GETs only, never on the PATCH.
+- Security headers: the lib's `securityHeaders` + `apiOnlyHeaders()` (`default-src 'none'` everywhere but
+  `/docs`).
 
 **Routes:**
 - `routes/health.ts` — liveness only (`{ status: 'ok' }`), no upstream call.
-- `routes/check_apis.ts` — dependency diagnostic; pings each `<service>/health`, returns 200 or 502.
+- `routes/check_apis.ts` — dependency diagnostic: the lib's `checkApis({ core_api: ... })` probes Core `/health`
+  without session (same `CORE_API_URL` as the real calls), returns 200 or 502 with the `CheckApisResponse`
+  schema (`checkApisResponseSchema(['core_api'])`). Add a probe for any new upstream.
 - `routes/settings.ts` — the real work:
   - `GET /settings/bootstrap` aggregates Core `/api/v1/user/me/` (required; failure = error) and
     `/api/v1/sessions/` (optional; failure sets `sources.sessions: 'unavailable'`). Session objects
     are re-parsed through a Zod schema, which strips internal fields like `token_hash`.
-  - `PATCH /settings/profile` validates against `ProfilePatchSchema` (`.strict()` — unknown fields
-    and empty bodies are 400, never a silent success), PATCHes Core, then **re-reads** and returns the
+  - `PATCH /settings/profile` validates with the lib's `parseRequest(ProfilePatchSchema, req.body, 'body')`
+    (`.strict()`: unknown fields are a 400 `Validation failed` with `body.<field>` details) and refuses an
+    empty patch with the same 400 (never a silent success), PATCHes Core, then **re-reads** and returns the
     persisted profile.
   - `PATCH /settings/{notifications,appearance,general}` answer 404 without calling Core (Core serves
     neither `notification-settings/` nor `preferences/`) and never fabricate a local save.
@@ -146,8 +154,6 @@ non-401/403 answer. The spec requires `bearerAuth` at the top level (`openapi.ts
   only during `npm ci`; the test compose files declare both secrets.
 - `contracts:sync` is referenced in the docs/CONTRACT.md but `scripts/contracts.mjs` has `source = null`,
   so the sync branch is an inert stub — syncing to web-service repos is not wired up here.
-- `src/views/check_api_view.ts` defines `CheckApiResponseSchema` but the `check_apis` route builds its
-  response object ad hoc; the schema is not what's served.
 - `.npmrc` points `@mairie360:*` at GitHub Packages and needs `NODE_AUTH_TOKEN`; the only `@mairie360/*`
   package is the `core-api-openapi` devDependency used by the tests (no runtime client).
 - `cicd.yml` calls the shared `mairie360/CICD` `BFFs-cicd.yml@v2.3.0` (with `openapi_spec_path` and

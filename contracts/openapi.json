@@ -73,6 +73,29 @@
           "error"
         ]
       },
+      "CheckApisResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "OK",
+              "Error"
+            ]
+          },
+          "core_api": {
+            "type": "string",
+            "enum": [
+              "Connected",
+              "Unreachable"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "core_api"
+        ]
+      },
       "SettingsProfile": {
         "type": "object",
         "properties": {
@@ -211,7 +234,7 @@
         "tags": [
           "Connectivity"
         ],
-        "summary": "Vérifie la santé du BFF",
+        "summary": "Checks that the BFF is up",
         "responses": {
           "200": {
             "description": "OK",
@@ -240,45 +263,27 @@
     "/check_apis": {
       "get": {
         "security": [],
+        "tags": [
+          "Connectivity"
+        ],
+        "summary": "Checks that the upstream APIs are reachable",
         "responses": {
           "200": {
-            "description": "Services disponibles",
+            "description": "Every upstream API is reachable",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "status"
-                  ],
-                  "additionalProperties": {
-                    "type": "string"
-                  }
+                  "$ref": "#/components/schemas/CheckApisResponse"
                 }
               }
             }
           },
           "502": {
-            "description": "Service indisponible",
+            "description": "At least one upstream API is unreachable",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "status"
-                  ],
-                  "additionalProperties": {
-                    "type": "string"
-                  }
+                  "$ref": "#/components/schemas/CheckApisResponse"
                 }
               }
             }

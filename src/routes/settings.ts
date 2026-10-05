@@ -1,8 +1,8 @@
-import { HttpError, requireBearer } from '@mairie360/bffs-lib';
-import { Router } from 'express';
+import { HttpError, asCaller, callUpstream, parseRequest, requireBearer, validationError } from '@mairie360/bffs-lib';
+import { Router, type Request } from 'express';
 import { z } from 'zod';
 import { registry, ErrorSchema } from '../openapi-registry';
-import { asCaller, coreApi, coreError } from '../clients/coreClient';
+import { coreApi } from '../clients/coreClient';
 
 const errorContent = { content: { 'application/json': { schema: ErrorSchema } } };
 const passthroughContent = { content: { 'application/json': { schema: z.record(z.string(), z.unknown()) } } };
@@ -50,36 +50,44 @@ registry.registerPath({ method: 'get', path: '/settings/bootstrap', responses: {
   200: { description: 'Core profile and sessions of the signed-in user', content: { 'application/json': { schema: BootstrapSchema } } },
   ...upstreamErrors, 502: { description: 'Profile unavailable', ...errorContent },
 } });
+const SessionsResultSchema = z.object({ sessions: z.array(SessionSchema) });
+
+/** The caller's Core profile; an invalid answer is a 502 (`The CORE_API answer is invalid.`). */
+async function readProfile(req: Request) {
+  return callUpstream(
+    'CORE_API',
+    async () => ProfileSchema.parse((await coreApi.getMe(asCaller('CORE_API', req))).data),
+    { declared: [401], retry: true },
+  );
+}
+
 router.get('/bootstrap', async (req, res) => {
+  const profile = await readProfile(req);
+  let sessions: z.infer<typeof SessionSchema>[] = [];
+  let sessionSource: 'available' | 'unavailable' = 'unavailable';
   try {
-    const profile = ProfileSchema.parse((await coreApi.getMe(asCaller(req))).data);
-    let sessions: z.infer<typeof SessionSchema>[] = [];
-    let sessionSource: 'available' | 'unavailable' = 'unavailable';
-    try {
-      const response = (await coreApi.getActiveSessions(asCaller(req))).data;
-      sessions = z.object({ sessions: z.array(SessionSchema) }).parse(response).sessions;
-      sessionSource = 'available';
-    } catch { /* Session availability is separate from profile availability. */ }
-    return res.json(BootstrapSchema.parse({ profile, sessions, sources: { sessions: sessionSource } }));
-  } catch (error) { throw coreError(error, [401]); }
+    sessions = await callUpstream(
+      'CORE_API',
+      async () => SessionsResultSchema.parse((await coreApi.getActiveSessions(asCaller('CORE_API', req))).data).sessions,
+      { retry: true },
+    );
+    sessionSource = 'available';
+  } catch { /* Session availability is separate from profile availability. */ }
+  return res.json(BootstrapSchema.parse({ profile, sessions, sources: { sessions: sessionSource } }));
 });
 registry.registerPath({ method: 'patch', path: '/settings/profile', request: {
   body: { required: true, content: { 'application/json': { schema: ProfilePatchSchema } } },
 }, responses: { 200: { description: 'Profile saved, then read again', content: { 'application/json': { schema: ProfileSchema } } }, 400: { description: 'Invalid or unsupported fields', ...errorContent }, ...upstreamErrors } });
 router.patch('/profile', async (req, res) => {
-  const body = ProfilePatchSchema.safeParse(req.body);
-  if (!body.success || !Object.keys(body.data).length) {
-    throw new HttpError(400, 'The allowed fields are first name, last name, e-mail and phone.', {
-      details: body.success ? [] : body.error.issues.map((issue) => ({ path: ['body', ...issue.path].join('.'), message: issue.message })),
-    });
+  const body = parseRequest(ProfilePatchSchema, req.body, 'body');
+  // An empty patch is refused instead of answering a save that changed nothing.
+  if (!Object.keys(body).length) {
+    throw validationError('body', [{ path: [], message: 'Expected at least one of first_name, last_name, email, phone' }]);
   }
-  try {
-    const patch = typeof body.data.phone === 'string'
-      ? { ...body.data, phone: body.data.phone.replace(/[\s.-]/g, '') }
-      : body.data;
-    await coreApi.patchMe(patch, asCaller(req));
-    return res.json(ProfileSchema.parse((await coreApi.getMe(asCaller(req))).data));
-  } catch (error) { throw coreError(error, [400, 401]); }
+  const patch = typeof body.phone === 'string' ? { ...body, phone: body.phone.replace(/[\s.-]/g, '') } : body;
+  // Not retried: only idempotent reads are.
+  await callUpstream('CORE_API', () => coreApi.patchMe(patch, asCaller('CORE_API', req)), { declared: [400, 401] });
+  return res.json(await readProfile(req));
 });
 
 // Core API exposes no preference operation: these sections answer 404 and never fake a local save.

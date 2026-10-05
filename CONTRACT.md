@@ -9,7 +9,7 @@ Les chemins sont relatifs au BFF. Les proxies web conservent méthode, paramètr
 | Méthode | Route | Réponse / schéma |
 | --- | --- | --- |
 | GET | `/health` | 200 OK |
-| GET | `/check_apis` | 200 Services disponibles |
+| GET | `/check_apis` | 200 / 502 CheckApisResponse |
 | GET | `/settings/bootstrap` | 200 SettingsBootstrap |
 | PATCH | `/settings/profile` | 200 SettingsProfile |
 | PATCH | `/settings/notifications` | 200 Préférences enregistrées par Core |
