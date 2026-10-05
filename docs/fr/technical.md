@@ -35,7 +35,7 @@ CORE_API_URL=http://localhost:3000
 npm run start
 ```
 
-`PORT` est optionnel; le repli de `src/index.ts` est `4008`.
+`PORT` est optionnel; le repli de `src/index.ts` est `4008`. `CORE_API_URL` est obligatoire : le processus refuse de démarrer sans valeur valide (`Missing or invalid upstream configuration: CORE_API_URL`), et il n’y a aucun repli sur `localhost`. `.env` est chargé par `import 'dotenv/config'` en première ligne de `src/index.ts`.
 
 Vérifier le processus puis consulter la documentation interactive:
 
@@ -52,7 +52,7 @@ Les valeurs ci-dessous sont des exemples locaux ou des comportements expliciteme
 | Variable ou priorité | Exemple / repli indiqué | Rôle |
 | --- | --- | --- |
 | `PORT` | 4008 | Port de cet exemple local. |
-| `CORE_API_URL` | http://localhost:3000 | Adresse de Core; doit être configurée sans suffixe de route. |
+| `CORE_API_URL` | http://localhost:3000 | Obligatoire. Adresse de Core (schéma optionnel, `http` par défaut), sans suffixe de route; relue à chaque appel, 503 si absente ou invalide. |
 | `CORE_API_PORT` | — | Port optionnel si absent de l’URL. |
 | `TRUST_PROXY` | non défini (aucun proxy de confiance) | `trust proxy` d’Express (`true`, un nombre de sauts ou des adresses/sous-réseaux), pour que `req.ip` soit le vrai client derrière l’ingress. |
 
@@ -94,9 +94,9 @@ Le générateur de types est fixé à `openapi-typescript@7.10.1` dans `scripts/
 
 Le job `contracts.yml` utilise Node.js 24, `actions/checkout@v7` et `actions/setup-node@v7`. Il s’exécute sur push, pull request et lancement manuel; il installe avec `npm ci`, contrôle les contrats et lance les tests dédiés.
 
-Le fichier `cicd.yml` appelle le workflow partagé `mairie360/CICD` `BFFs-cicd.yml@v3.0.0` (`cicd_version: v3.0.0`, `node_version: "22"`, `openapi_spec_path: contracts/openapi.json`). Les releases sont gérées par semantic-release (`.releaserc.json`).
+Le fichier `cicd.yml` appelle le workflow partagé `mairie360/CICD` `BFFs-cicd.yml@v3.2.0` (`cicd_version: v3.2.0`, `node_version: "24"`, `openapi_spec_path: contracts/openapi.json`). Les releases sont gérées par semantic-release (`.releaserc.json`).
 
-Le Dockerfile utilise `node:24-alpine` pour la construction et l’exécution; la commande de l’image est `["node", "dist/index.js"]`. Les identifiants GitHub Packages ne sont montés qu’en secrets BuildKit (`npmrc`, `node_auth_token`) pendant `npm ci`.
+Les Dockerfiles utilisent `node:24-alpine` épinglé par digest pour chaque étape (même Node.js 24 que les deux workflows); la commande de l’image est `["node", "dist/index.js"]`. Les identifiants GitHub Packages ne sont montés qu’en secrets BuildKit (`npmrc`, `node_auth_token`) pendant `npm ci`.
 
 `security_test.sh` et `performance_test.sh` testent l’image désignée par `IMAGE_REF`: en CI, l’image que `release-dev` vient de publier, soit l’artefact ensuite promu en staging puis en prod. Quand `IMAGE_REF` est vide (usage local), ils construisent d’abord `bff-settings:local` depuis `development.Dockerfile`, ce qui demande `NODE_AUTH_TOKEN` et `./.npmrc`.
 

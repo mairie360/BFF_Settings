@@ -12,7 +12,7 @@ the web service consumes. It holds no database and no local state.
 ## Commands
 
 ```bash
-npm ci                      # install (Node.js 24 in contracts CI and Docker images)
+npm ci                      # install (Node.js 24 in both workflows and the Docker images)
 npm run start               # ts-node src/index.ts, listens on PORT (default 4008)
 npm run build               # tsc -> dist/
 npm run lint                # eslint (flat config: eslint.config.cjs)
@@ -45,9 +45,9 @@ and `requireBearer` (401 before any Core call without `Authorization: Bearer <to
 (400 for an unparsable body) and turn anything unexpected into a generic 500.
 
 **`src/clients/`:**
-- `upstream.ts`: `baseUrl(service)` resolves `<SERVICE>_URL` (+ optional `<SERVICE>_PORT`), `HttpError(503)` when missing.
 - `coreClient.ts`: the generated Core client (`coreApi`, `asCaller(req)` with the lib's `authorization(req)`,
-  `withoutSession()`) and
+  `withoutSession()`; the base URL comes from the lib's `baseUrl('CORE_API')` on every call:
+  `CORE_API_URL` + optional `CORE_API_PORT`, `HttpError(503)` when missing, no `localhost` default) and
   `coreError(error, declared)`: only the Core 4xx listed in `declared` (the statuses the route's contract
   declares) are kept; any other status, a network failure or an invalid answer (ZodError) becomes a 502.
   The Core body is never relayed.
@@ -137,8 +137,11 @@ non-401/403 answer. The spec requires `bearerAuth` at the top level (`openapi.ts
 
 - **ESLint** uses only the flat `eslint.config.cjs` (the legacy `.eslintrc.js` was removed, like in the
   sibling BFFs).
-- **Node version split.** `contracts.yml` and the Dockerfiles (`node:24-alpine`) use Node 24, while the
-  shared `cicd.yml` still passes `node_version: "22"` (same as every sibling BFF).
+- **Node version.** `contracts.yml`, `cicd.yml` (`node_version: "24"`) and every Dockerfile stage use
+  Node 24; the images pin `node:24-alpine` by digest (Renovate bumps it).
+- **Fail fast.** `src/index.ts` loads `dotenv/config` first, then `start()` runs the lib's
+  `assertConfigured(UPSTREAMS)` (`['CORE_API']`) before `listen`, only under `require.main === module`.
+  Add any new upstream to `UPSTREAMS`.
 - Dockerfiles read GitHub Packages credentials through BuildKit secrets (`npmrc`, `node_auth_token`)
   only during `npm ci`; the test compose files declare both secrets.
 - `contracts:sync` is referenced in the docs/CONTRACT.md but `scripts/contracts.mjs` has `source = null`,
