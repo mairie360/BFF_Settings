@@ -6,17 +6,17 @@ import { PREFERENCE_TARGETS, bearer, coreApiUrls, meResponse, patchMe, profileOf
 import { OpenApiContract } from './support/openapi-contract';
 import { loadOrvalContract } from './support/orval-contract';
 
-// Toute l'application est testée avec le vrai client fetch contre un vrai serveur HTTP simulant Core API. Son contrat
-// est reconstruit depuis le paquet @mairie360/core-api-openapi installé (version épinglée dans package.json) : le mock
-// refuse les routes, paramètres et corps absents du contrat et valide ses réponses de succès. Les erreurs ne sont pas
-// typées par orval : toute réponse d'erreur simulée est marquée `outOfContract`. Chaque réponse du BFF est validée
-// contre contracts/openapi.json. Les corps simulés sont typés par les modèles générés et les chemins attendus
-// viennent des helpers d'URL du client généré.
+// The whole application is tested with the real client against a real HTTP server simulating Core API. Its contract
+// is rebuilt from the installed @mairie360/core-api-openapi package (version pinned in package.json): the mock
+// refuses routes, parameters and bodies absent from the contract and validates its success answers. Errors are not
+// typed by orval: every simulated error answer is marked `outOfContract`. Every BFF answer is validated against
+// contracts/openapi.json. Simulated bodies are typed by the generated models and the expected paths come from the
+// URL helpers of the generated client.
 
 const coreApi = new ContractMockServer('CORE_API', loadOrvalContract('@mairie360/core-api-openapi'));
-// Gabarits du contrat Core API (clés des mocks) ; les chemins concrets attendus viennent de coreApiUrls.
+// Core API contract templates (mock keys); the concrete expected paths come from coreApiUrls.
 const CORE = { me: '/api/v1/user/me/', sessions: '/api/v1/sessions/', health: '/health' } as const;
-/** Appels reçus par Core API, sous la forme `MÉTHODE chemin` (chemin tel que le construit le client généré). */
+/** Calls received by Core API, as `METHOD path` (path as built by the generated client). */
 const upstreamSequence = () => coreApi.requests.map((call) => `${call.method} ${call.url.pathname}`);
 const called = (method: string, url: string) => `${method} ${url}`;
 const bffContract = OpenApiContract.load(path.join(__dirname, '..', 'contracts', 'openapi.json'));
@@ -25,7 +25,7 @@ beforeAll(async () => { await coreApi.start(); });
 afterAll(async () => { await coreApi.stop(); });
 beforeEach(() => {
   coreApi.reset();
-  // baseUrl() relit CORE_API_URL et CORE_API_PORT à chaque requête : pas de rechargement de module.
+  // baseUrl() reads CORE_API_URL and CORE_API_PORT again on every request: no module reload.
   const url = new URL(coreApi.url);
   process.env.CORE_API_URL = url.hostname;
   process.env.CORE_API_PORT = url.port;
@@ -42,7 +42,7 @@ function expectBffContract(method: string, pathname: string, response: request.R
   if (schema && response.type === 'application/json') expect(bffContract.validate(schema, response.body)).toEqual([]);
 }
 
-/** Erreur Core API : non typée par orval, donc hors contrat. Core renvoie un texte brut (ResponseError actix). */
+/** Core API error: not typed by orval, so out of contract. Core answers plain text (actix ResponseError). */
 const coreError = (status: number, raw = 'An error occurred while accessing the database.'): MockReply =>
   ({ status, raw, contentType: 'text/plain; charset=utf-8', outOfContract: true });
 
@@ -141,7 +141,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(response.status).toBe(200);
       expectBffContract('get', '/settings/bootstrap', response);
       expect(response.headers['cache-control']).toBe('no-store');
-      // groups, role et status de Core ne sortent pas du BFF.
+      // Core's groups, role and status do not leave the BFF.
       expect(response.body).toEqual({ profile: profileOf(me), sessions, sources: { sessions: 'available' } });
       expect(upstreamSequence()).toEqual([called('GET', coreApiUrls.getGetMeUrl()), called('GET', coreApiUrls.getGetActiveSessionsUrl())]);
       for (const upstream of coreApi.requests) {
@@ -236,6 +236,19 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(coreApi.calls(CORE.sessions)).toHaveLength(0);
     });
 
+    test.each<[string, MockReply, number]>([
+      ['a Core 503', coreError(503, 'Service Unavailable'), 2],
+      ['a dropped connection', { dropConnection: true }, 2],
+      ['a Core 500', coreError(500), 1],
+      ['a Core 401', coreError(401, ''), 1],
+    ])('retries the idempotent profile read only on a transient failure (%s)', async (_label, reply, attempts) => {
+      coreApi.on('get', CORE.me, reply);
+
+      await withSession(request(app).get('/settings/bootstrap'));
+
+      expect(coreApi.calls(CORE.me, 'get')).toHaveLength(attempts);
+    });
+
     test('answers 502 instead of a partial profile when Core omits a required field', async () => {
       coreApi.on('get', CORE.me, { body: without(meResponse(), 'email'), outOfContract: true });
 
@@ -253,7 +266,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       ['204', { status: 204 }],
     ] as const)('sends the patch to PATCH /api/v1/user/me/, accepts a %s and returns the re-read profile', async (_label, patchReply) => {
       const patch = patchMe({ first_name: 'Anne Marie', last_name: 'Le Gall', email: 'anne.marie@mairie.test', phone: '+33987654321' });
-      // Le profil relu fait foi, même s'il diffère de ce qui a été envoyé (normalisation côté Core).
+      // The re-read profile wins, even when it differs from what was sent (normalised by Core).
       const persisted = meResponse({ first_name: 'Anne Marie', last_name: 'LE GALL', email: 'anne.marie@mairie.test', phone: '+33987654321' });
       coreApi
         .on('patch', CORE.me, patchReply)
@@ -314,7 +327,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
 
       expect(response.status).toBe(400);
       expectBffContract('patch', '/settings/profile', response);
-      expect(response.body.error).toMatchObject({ code: 'BAD_REQUEST', message: 'The allowed fields are first name, last name, e-mail and phone.' });
+      expect(response.body.error).toMatchObject({ code: 'BAD_REQUEST', message: 'Validation failed' });
       expect(Array.isArray(response.body.error.details)).toBe(true);
       expect(coreApi.requests).toHaveLength(0);
     });
@@ -329,11 +342,25 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       ]));
     });
 
-    test('answers an empty body with no details', async () => {
+    test('answers an empty body with a detail naming the accepted fields', async () => {
       const response = await withSession(request(app).patch('/settings/profile').send({}));
 
       expect(response.status).toBe(400);
-      expect(response.body.error.details).toEqual([]);
+      expectBffContract('patch', '/settings/profile', response);
+      expect(response.body).toEqual({ error: { code: 'BAD_REQUEST', message: 'Validation failed', details: [
+        { path: 'body', message: 'Expected at least one of first_name, last_name, email, phone' },
+      ] } });
+      expect(coreApi.requests).toHaveLength(0);
+    });
+
+    test('does not retry the PATCH on a transient Core failure', async () => {
+      coreApi.on('patch', CORE.me, coreError(503, 'Service Unavailable'));
+
+      const response = await withSession(request(app).patch('/settings/profile').send({ first_name: 'Anne' }));
+
+      expect(response.status).toBe(502);
+      expect(coreApi.calls(CORE.me, 'patch')).toHaveLength(1);
+      expect(coreApi.calls(CORE.me, 'get')).toHaveLength(0);
     });
 
     test('rejects a malformed JSON body with 400', async () => {
@@ -397,7 +424,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(response.body).toEqual({ status: 'OK', core_api: 'Connected' });
       const [health] = coreApi.calls(CORE.health, 'get');
       expect(coreApi.requests).toHaveLength(1);
-      // Sonde de disponibilité : aucune session n'est transmise.
+      // Availability probe: no session is forwarded.
       expect(health.headers.authorization).toBeUndefined();
     });
 

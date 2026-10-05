@@ -5,13 +5,13 @@ import { PREFERENCE_TARGETS, coreApiUrls, group, meResponse, patchMe, session, s
 import type { JsonSchema } from './support/openapi-contract';
 import { loadOrvalContract, resolveOrvalPackage } from './support/orval-contract';
 
-// Le contrat Core API est reconstruit depuis le paquet @mairie360/core-api-openapi installé :
-// monter la version dans package.json suffit à tester le BFF contre le nouveau contrat.
+// The Core API contract is rebuilt from the installed @mairie360/core-api-openapi package:
+// bumping the version in package.json is enough to test the BFF against the new contract.
 
 const PACKAGE = '@mairie360/core-api-openapi';
 
-// Opérations Core réellement appelées par le BFF (src/routes/settings.ts, src/routes/check_apis.ts), adressées par
-// les helpers d'URL du client généré.
+// Core operations actually called by the BFF (src/routes/settings.ts, src/routes/check_apis.ts), addressed by the
+// URL helpers of the generated client.
 const CONSUMED = [
   { operationId: 'getMe', method: 'get', url: coreApiUrls.getGetMeUrl() },
   { operationId: 'patchMe', method: 'patch', url: coreApiUrls.getPatchMeUrl() },
@@ -52,7 +52,7 @@ describe('Core API contract from the installed @mairie360/core-api-openapi packa
 
     const patch = coreApi.match('PATCH', coreApiUrls.getPatchMeUrl())!;
     expect(coreApi.requestBodySchema(patch)).toEqual({ required: true, schema: { $ref: '#/components/schemas/PatchMeView' } });
-    // Core répond 200 sans corps : aucun schéma de réponse, le BFF doit relire le profil.
+    // Core answers 200 without a body: no response schema, the BFF must re-read the profile.
     expect(coreApi.responseSchema(patch, 200)).toEqual({ documented: true, schema: undefined });
 
     const sessions = coreApi.match('GET', coreApiUrls.getGetActiveSessionsUrl())!;
@@ -60,7 +60,7 @@ describe('Core API contract from the installed @mairie360/core-api-openapi packa
     expect(coreApi.validate(coreApi.schema('GetSessionsResultView'), sessionsResult([session('s-1')]))).toEqual([]);
 
     expect(coreApi.responseSchema(coreApi.match('GET', coreApiUrls.getHealthUrl())!, 200)).toEqual({ documented: true, schema: undefined });
-    // Les erreurs ne sont pas typées par orval : aucun statut hors 2XX n'est documenté.
+    // Errors are not typed by orval: no non-2XX status is documented.
     expect(coreApi.responseSchema(getMe, 401).documented).toBe(false);
   });
 });
@@ -80,7 +80,7 @@ describe('BFF Settings schemas stay compatible with the Core API contract', () =
 });
 
 describe('known gaps between the Core API contract and what the BFF calls', () => {
-  // Quand ce test échoue, Core API expose les préférences : le BFF doit les relayer au lieu de répondre 404.
+  // When this test fails, Core API exposes the preferences: the BFF must relay them instead of answering 404.
 
   test.each(PREFERENCE_TARGETS)('PATCH $template (/settings/$section) is not exposed by Core API', ({ template }) => {
     expect(coreApi.document.paths[template]).toBeUndefined();

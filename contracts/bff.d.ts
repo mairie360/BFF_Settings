@@ -11,7 +11,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Vérifie la santé du BFF */
+        /** Checks that the BFF is up */
         get: {
             parameters: {
                 query?: never;
@@ -50,6 +50,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Checks that the upstream APIs are reachable */
         get: {
             parameters: {
                 query?: never;
@@ -59,30 +60,22 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Services disponibles */
+                /** @description Every upstream API is reachable */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            status: string;
-                        } & {
-                            [key: string]: string;
-                        };
+                        "application/json": components["schemas"]["CheckApisResponse"];
                     };
                 };
-                /** @description Service indisponible */
+                /** @description At least one upstream API is unreachable */
                 502: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            status: string;
-                        } & {
-                            [key: string]: string;
-                        };
+                        "application/json": components["schemas"]["CheckApisResponse"];
                     };
                 };
             };
@@ -510,6 +503,12 @@ export interface components {
                     message: string;
                 }[];
             };
+        };
+        CheckApisResponse: {
+            /** @enum {string} */
+            status: "OK" | "Error";
+            /** @enum {string} */
+            core_api: "Connected" | "Unreachable";
         };
         SettingsProfile: {
             /** @example Security */

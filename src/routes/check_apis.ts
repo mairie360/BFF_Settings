@@ -1,19 +1,26 @@
+import { checkApis, checkApisResponseSchema, withoutSession } from '@mairie360/bffs-lib';
 import { Router } from 'express';
-import { z } from 'zod';
 import { registry } from '../openapi-registry';
-import { coreApi, withoutSession } from '../clients/coreClient';
+import { coreApi } from '../clients/coreClient';
 
 const router = Router();
-const CheckApisSchema = z.object({ status: z.string() }).catchall(z.string());
-registry.registerPath({ method: 'get', path: '/check_apis', security: [], responses: {
-  200: { description: 'Services disponibles', content: { 'application/json': { schema: CheckApisSchema } } },
-  502: { description: 'Service indisponible', content: { 'application/json': { schema: CheckApisSchema } } },
-} });
-router.get('/', async (_req, res) => {
-  const services = ["CORE_API"];
-  // Le callback est asynchrone : une configuration absente est rejetée au lieu d'être levée hors du map.
-  const results = await Promise.allSettled(services.map(async () => coreApi.health(withoutSession())));
-  const ok = results.every((result) => result.status === 'fulfilled');
-  res.status(ok ? 200 : 502).json({ status: ok ? 'OK' : 'Error', ...Object.fromEntries(services.map((service, index) => [service.toLowerCase(), results[index].status === 'fulfilled' ? 'Connected' : 'Unreachable'])) });
+
+// One `<service>: Connected | Unreachable` entry per upstream the BFF calls, probed with the same
+// environment variables as the real calls (a missing CORE_API_URL is reported as unreachable).
+export const CheckApisSchema = registry.register('CheckApisResponse', checkApisResponseSchema(['core_api']));
+
+registry.registerPath({
+  method: 'get',
+  path: '/check_apis',
+  security: [],
+  tags: ['Connectivity'],
+  summary: 'Checks that the upstream APIs are reachable',
+  responses: {
+    200: { description: 'Every upstream API is reachable', content: { 'application/json': { schema: CheckApisSchema } } },
+    502: { description: 'At least one upstream API is unreachable', content: { 'application/json': { schema: CheckApisSchema } } },
+  },
 });
+
+router.get('/', checkApis({ core_api: () => coreApi.health(withoutSession('CORE_API', 5_000)) }));
+
 export default router;

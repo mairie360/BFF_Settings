@@ -37,4 +37,22 @@ describe('startup configuration check', () => {
     expect((server.address() as AddressInfo).port).toBeGreaterThan(0);
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   });
+
+  test('listens on PORT when no port is given', async () => {
+    process.env.CORE_API_URL = 'http://core:3000';
+    const savedPort = process.env.PORT;
+    process.env.PORT = '0';
+    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    try {
+      const server = start();
+      await new Promise<void>((resolve) => server.once('listening', resolve));
+
+      expect((server.address() as AddressInfo).port).toBeGreaterThan(0);
+      await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+    } finally {
+      if (savedPort === undefined) delete process.env.PORT;
+      else process.env.PORT = savedPort;
+    }
+  });
 });

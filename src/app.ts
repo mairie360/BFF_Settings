@@ -1,7 +1,6 @@
 import 'dotenv/config';
-import { errorHandler, noStore, notFoundHandler, parseTrustProxy } from '@mairie360/bffs-lib';
+import { apiOnlyHeaders, errorHandler, noStore, notFoundHandler, parseTrustProxy, securityHeaders } from '@mairie360/bffs-lib';
 import express from 'express';
-import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import { openApiDocument } from './openapi';
 import healthRouter from './routes/health';
@@ -11,16 +10,11 @@ import moduleRouter from './routes/settings';
 export const app = express();
 // Client IP (req.ip) seen behind the ingress: see parseTrustProxy (TRUST_PROXY unset = no proxy trusted).
 app.set('trust proxy', parseTrustProxy(process.env.TRUST_PROXY));
-// Security headers (CSP, X-Content-Type-Options, Permissions-Policy, CORP...) and removal of
-// X-Powered-By, same configuration as BFF User. Runs first (before body parsing) so it also covers
-// body-parse error responses. upgrade-insecure-requests is dropped because the BFF is served over
-// HTTP behind the reverse proxy.
-app.use(helmet({
-  contentSecurityPolicy: {
-    useDefaults: true,
-    directives: { 'upgrade-insecure-requests': null },
-  },
-}));
+// Security headers shared by every BFF (helmet: CSP, X-Content-Type-Options, CORP..., no X-Powered-By),
+// then the stricter API-only headers (default-src 'none') everywhere but /docs. Both run before body
+// parsing so they also cover body-parse error responses.
+app.use(securityHeaders);
+app.use(apiOnlyHeaders());
 
 app.use(express.json());
 

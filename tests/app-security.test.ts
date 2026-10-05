@@ -4,22 +4,31 @@ import app from '../src/app';
 import { ProfilePatchSchema } from '../src/routes/settings';
 
 describe('application-wide security middleware', () => {
-  test.each(['/health', '/unknown-route'])('%s carries the helmet security headers and no X-Powered-By', async (pathname) => {
+  test.each(['/health', '/unknown-route', '/settings/bootstrap'])('%s carries the strict API-only security headers and no X-Powered-By', async (pathname) => {
     const response = await request(app).get(pathname);
 
     expect(response.headers['x-powered-by']).toBeUndefined();
     expect(response.headers['x-content-type-options']).toBe('nosniff');
     expect(response.headers['cross-origin-resource-policy']).toBe('same-origin');
-    expect(response.headers['content-security-policy']).toContain("default-src 'self'");
-    expect(response.headers['content-security-policy']).not.toContain('upgrade-insecure-requests');
+    expect(response.headers['content-security-policy']).toBe("default-src 'none'");
+    expect(response.headers['permissions-policy']).toBe('geolocation=(), camera=(), microphone=()');
     expect(response.headers['x-frame-options']).toBe('SAMEORIGIN');
   });
 
-  test('a body-parse error also carries the security headers', async () => {
+  test('/docs keeps the helmet CSP so Swagger UI can load its scripts and styles', async () => {
+    const response = await request(app).get('/docs/');
+
+    expect(response.headers['x-powered-by']).toBeUndefined();
+    expect(response.headers['content-security-policy']).toContain("default-src 'self'");
+    expect(response.headers['content-security-policy']).not.toContain('upgrade-insecure-requests');
+  });
+
+  test('a body-parse error also carries the API-only security headers', async () => {
     const response = await request(app).patch('/settings/profile').set('Content-Type', 'application/json').send('{not json');
 
     expect(response.status).toBe(400);
     expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(response.headers['content-security-policy']).toBe("default-src 'none'");
   });
 });
 
