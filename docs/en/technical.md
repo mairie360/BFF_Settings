@@ -54,6 +54,7 @@ Values below are local examples or explicitly described behavior, not production
 | `PORT` | 4008 | Port used by this local example. |
 | `CORE_API_URL` | http://localhost:3000 | Core base address; must be configured without a route suffix. |
 | `CORE_API_PORT` | — | Optional port when absent from the URL. |
+| `TRUST_PROXY` | unset (no proxy trusted) | Express `trust proxy` (`true`, a hop count or addresses/subnets), so `req.ip` is the real client behind the ingress. |
 
 ## Routes and data contract
 
@@ -71,7 +72,7 @@ Inventory extracted from `contracts/openapi.json`. Replace brace parameters with
 
 ## Session, permissions and errors
 
-All `/settings` routes require a Bearer token. Profile errors block bootstrap; session errors set `sources.sessions` to `unavailable`. Core calls have a 10-second timeout and business responses use `no-store`. Every error is answered in the envelope shared by all the BFFs (`@mairie360/bffs-lib`), declared as `ErrorResponse` in the contract: `{ "error": { "code": "BAD_GATEWAY", "message": "...", "details": [] } }`. `code` follows the HTTP status; `details` lists the invalid fields of a PATCH 400 (`{ "path": "body.email", "message": "..." }`) and is empty otherwise. Only the Core 4xx a route declares are preserved (401 on bootstrap, 400 and 401 on the profile PATCH); any other Core status, a Core outage (network, timeout) or an invalid Core answer becomes 502 without relaying the upstream body, and an unconfigured Core becomes 503. Unknown routes answer 404, an unparsable JSON body 400 and an unexpected error a generic 500. A Core success without body (Core answers an empty 200 to `PATCH /api/v1/user/me/`) is accepted, then the profile is re-read.
+All `/settings` routes require `Authorization: Bearer <token>` (the only accepted credential: cookies and `x-session-token` are ignored) and answer 401 before any Core call without it; the token is forwarded to Core normalised to `Bearer <token>`. Profile errors block bootstrap; session errors set `sources.sessions` to `unavailable`. Core calls have a 10-second timeout and business responses use `no-store`. Every error is answered in the envelope shared by all the BFFs (`@mairie360/bffs-lib`), declared as `ErrorResponse` in the contract: `{ "error": { "code": "BAD_GATEWAY", "message": "...", "details": [] } }`. `code` follows the HTTP status; `details` lists the invalid fields of a PATCH 400 (`{ "path": "body.email", "message": "..." }`) and is empty otherwise. Only the Core 4xx a route declares are preserved (401 on bootstrap, 400 and 401 on the profile PATCH); any other Core status, a Core outage (network, timeout) or an invalid Core answer becomes 502 without relaying the upstream body, and an unconfigured Core becomes 503. Unknown routes answer 404, an unparsable JSON body 400 and an unexpected error a generic 500. A Core success without body (Core answers an empty 200 to `PATCH /api/v1/user/me/`) is accepted, then the profile is re-read.
 
 ## Synchronization and verification
 

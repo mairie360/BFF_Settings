@@ -1,9 +1,9 @@
 import { getCoreAPIMairie360 } from '@mairie360/core-api-openapi/endpoints/coreAPIMairie360';
-import { HttpError, mapUpstreamError } from '@mairie360/bffs-lib';
+import { HttpError, authorization, mapUpstreamError } from '@mairie360/bffs-lib';
 import axios, { type AxiosRequestConfig } from 'axios';
 import type { Request } from 'express';
 import { ZodError } from 'zod';
-import { authorization, baseUrl } from './upstream';
+import { baseUrl } from './upstream';
 
 // Core API is only called through the operations of its published contract (@mairie360/core-api-openapi).
 const coreAxios = axios.create({ timeout: 10_000, headers: { Accept: 'application/json' } });
@@ -12,7 +12,8 @@ export const coreApi = getCoreAPIMairie360(coreAxios);
 
 /**
  * Options of a Core call on behalf of the caller. The URL is read again on every request (the
- * environment can change without a restart); a caller without a session is refused before the call.
+ * environment can change without a restart); a caller without a session is refused before the call,
+ * and the token is forwarded normalised to `Bearer <token>`.
  */
 export function asCaller(req: Request): AxiosRequestConfig {
   return {

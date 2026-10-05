@@ -1,9 +1,8 @@
-import { HttpError } from '@mairie360/bffs-lib';
+import { HttpError, requireBearer } from '@mairie360/bffs-lib';
 import { Router } from 'express';
 import { z } from 'zod';
 import { registry, ErrorSchema } from '../openapi-registry';
 import { asCaller, coreApi, coreError } from '../clients/coreClient';
-import { authorization } from '../clients/upstream';
 
 const errorContent = { content: { 'application/json': { schema: ErrorSchema } } };
 const passthroughContent = { content: { 'application/json': { schema: z.record(z.string(), z.unknown()) } } };
@@ -16,10 +15,8 @@ const upstreamErrors = {
 };
 
 const router = Router();
-router.use((req, _res, next) => {
-  authorization(req);
-  next();
-});
+// Every /settings route needs the caller's session: 401 before any Core call without a Bearer token.
+router.use(requireBearer);
 // The examples are valid values, so a generated request (Swagger UI, ZAP) is accepted.
 export const ProfileSchema = registry.register('SettingsProfile', z.object({
   first_name: z.string().openapi({ example: 'Security' }),

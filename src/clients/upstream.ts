@@ -1,13 +1,4 @@
 import { HttpError } from '@mairie360/bffs-lib';
-import type { Request } from 'express';
-
-/** The caller's `Authorization: Bearer <token>` header, forwarded unchanged; 401 without one. */
-export function authorization(req: Request): string {
-  const header = req.headers.authorization;
-  if (!header || !/^Bearer\s+\S+$/i.test(header)) throw new HttpError(401, 'Invalid session.');
-  return header;
-}
-
 /**
  * Base URL of an upstream service from `<SERVICE>_URL` (scheme optional) and `<SERVICE>_PORT`
  * (used when the URL has no port). Read on every call; 503 when the service is not configured.

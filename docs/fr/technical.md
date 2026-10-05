@@ -54,6 +54,7 @@ Les valeurs ci-dessous sont des exemples locaux ou des comportements expliciteme
 | `PORT` | 4008 | Port de cet exemple local. |
 | `CORE_API_URL` | http://localhost:3000 | Adresse de Core; doit être configurée sans suffixe de route. |
 | `CORE_API_PORT` | — | Port optionnel si absent de l’URL. |
+| `TRUST_PROXY` | non défini (aucun proxy de confiance) | `trust proxy` d’Express (`true`, un nombre de sauts ou des adresses/sous-réseaux), pour que `req.ip` soit le vrai client derrière l’ingress. |
 
 ## Routes et contrat de données
 
@@ -71,7 +72,7 @@ Inventaire extrait de `contracts/openapi.json`. Les paramètres entre accolades 
 
 ## Session, permissions et erreurs
 
-Toutes les routes `/settings` exigent un Bearer. Les erreurs de profil bloquent le bootstrap; les erreurs de session positionnent `sources.sessions` à `unavailable`. Les appels Core ont un délai de 10 secondes et les réponses métier utilisent `no-store`. Toutes les erreurs sont renvoyées dans l'enveloppe commune aux BFFs (`@mairie360/bffs-lib`), déclarée `ErrorResponse` dans le contrat : `{ "error": { "code": "BAD_GATEWAY", "message": "...", "details": [] } }`. `code` découle du statut HTTP ; `details` liste les champs invalides d'un PATCH en 400 (`{ "path": "body.email", "message": "..." }`) et est vide sinon. Seuls les 4xx de Core déclarés par la route sont conservés (401 sur le bootstrap, 400 et 401 sur le PATCH du profil) ; tout autre statut Core, une panne Core (réseau, délai) ou une réponse Core invalide produit 502 sans relayer le corps amont, et un Core non configuré produit 503. Une route inconnue répond 404, un corps JSON illisible 400 et une erreur inattendue un 500 générique. Un succès Core sans corps (Core répond 200 vide à `PATCH /api/v1/user/me/`) est accepté, puis le profil est relu.
+Toutes les routes `/settings` exigent `Authorization: Bearer <token>` (seul identifiant accepté : les cookies et `x-session-token` sont ignorés) et répondent 401 avant tout appel à Core sans lui ; le jeton est transmis à Core normalisé en `Bearer <token>`. Les erreurs de profil bloquent le bootstrap; les erreurs de session positionnent `sources.sessions` à `unavailable`. Les appels Core ont un délai de 10 secondes et les réponses métier utilisent `no-store`. Toutes les erreurs sont renvoyées dans l'enveloppe commune aux BFFs (`@mairie360/bffs-lib`), déclarée `ErrorResponse` dans le contrat : `{ "error": { "code": "BAD_GATEWAY", "message": "...", "details": [] } }`. `code` découle du statut HTTP ; `details` liste les champs invalides d'un PATCH en 400 (`{ "path": "body.email", "message": "..." }`) et est vide sinon. Seuls les 4xx de Core déclarés par la route sont conservés (401 sur le bootstrap, 400 et 401 sur le PATCH du profil) ; tout autre statut Core, une panne Core (réseau, délai) ou une réponse Core invalide produit 502 sans relayer le corps amont, et un Core non configuré produit 503. Une route inconnue répond 404, un corps JSON illisible 400 et une erreur inattendue un 500 générique. Un succès Core sans corps (Core répond 200 vide à `PATCH /api/v1/user/me/`) est accepté, puis le profil est relu.
 
 ## Synchronisation et vérifications
 

@@ -83,6 +83,30 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(coreApi.requests).toHaveLength(0);
     });
 
+    test.each(BFF_ROUTES.flatMap((route) => [
+      { ...route, label: 'an accessToken cookie', header: ['Cookie', 'accessToken=session-anne'] as const },
+      { ...route, label: 'a session cookie', header: ['Cookie', 'session=session-anne'] as const },
+      { ...route, label: 'an x-session-token header', header: ['x-session-token', 'session-anne'] as const },
+    ]))('$method $path ignores $label and answers 401 without calling Core', async (route) => {
+      const response = await call(route).set(route.header[0], route.header[1]);
+
+      expect(response.status).toBe(401);
+      expectBffContract(route.method, route.path, response);
+      expect(response.body).toEqual({ error: { code: 'UNAUTHORIZED', message: 'Invalid session.', details: [] } });
+      expect(coreApi.requests).toHaveLength(0);
+    });
+
+    test('forwards the token normalised to `Bearer <token>`', async () => {
+      coreApi
+        .on('get', CORE.me, { body: meResponse() })
+        .on('get', CORE.sessions, { body: sessionsResult([]) });
+
+      const response = await request(app).get('/settings/bootstrap').set('Authorization', 'bearer \tsession-42');
+
+      expect(response.status).toBe(200);
+      expect(coreApi.requests.map((upstream) => upstream.headers.authorization)).toEqual([bearer('session-42'), bearer('session-42')]);
+    });
+
     test.each(BFF_ROUTES)('$method $path answers 503 when Core API is not configured', async (route) => {
       delete process.env.CORE_API_URL;
 
