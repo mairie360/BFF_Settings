@@ -2,7 +2,9 @@ import path from 'node:path';
 import request from 'supertest';
 import app from '../src/app';
 import { ContractMockServer, unreachableUrl, type MockReply } from './support/contract-mock-server';
-import { PREFERENCE_TARGETS, bearer, coreApiUrls, meResponse, patchMe, profileOf, session, sessionsResult } from './support/core-fixtures';
+import {
+  PREFERENCE_SECTIONS, bearer, coreApiUrls, meResponse, notificationSettings, patchMe, preferences, profileOf, session, sessionsResult,
+} from './support/core-fixtures';
 import { OpenApiContract } from './support/openapi-contract';
 import { loadOrvalContract } from './support/orval-contract';
 
@@ -15,7 +17,20 @@ import { loadOrvalContract } from './support/orval-contract';
 
 const coreApi = new ContractMockServer('CORE_API', loadOrvalContract('@mairie360/core-api-openapi'));
 // Core API contract templates (mock keys); the concrete expected paths come from coreApiUrls.
-const CORE = { me: '/api/v1/user/me/', sessions: '/api/v1/sessions/', health: '/health' } as const;
+const CORE = {
+  me: '/api/v1/user/me/',
+  sessions: '/api/v1/sessions/',
+  preferences: '/api/v1/user/me/preferences/',
+  notifications: '/api/v1/user/me/notifications/',
+  health: '/health',
+} as const;
+// What the bootstrap answers for the default preference mocks (beforeEach).
+const STORED = {
+  appearance: { theme: 'dark', font_family: 'Marianne', font_size: 16, density: 'compact' },
+  general: { language: 'fr', timezone: 'Europe/Paris', date_format: 'DD/MM/YYYY', home_page: '/dashboard', auto_open_notifications: false },
+  notifications: { email: true, push: false, desktop: true, messages: true, projects: true, calendar: false },
+} as const;
+const ALL_AVAILABLE = { sessions: 'available', preferences: 'available', notifications: 'available' } as const;
 /** Calls received by Core API, as `METHOD path` (path as built by the generated client). */
 const upstreamSequence = () => coreApi.requests.map((call) => `${call.method} ${call.url.pathname}`);
 const called = (method: string, url: string) => `${method} ${url}`;
@@ -25,6 +40,8 @@ beforeAll(async () => { await coreApi.start(); });
 afterAll(async () => { await coreApi.stop(); });
 beforeEach(() => {
   coreApi.reset();
+  // The bootstrap reads them on every call: tests about them override these replies.
+  coreApi.on('get', CORE.preferences, { body: preferences() }).on('get', CORE.notifications, { body: notificationSettings() });
   // baseUrl() reads CORE_API_URL and CORE_API_PORT again on every request: no module reload.
   const url = new URL(coreApi.url);
   process.env.CORE_API_URL = url.hostname;
@@ -104,7 +121,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       const response = await request(app).get('/settings/bootstrap').set('Authorization', 'bearer \tsession-42');
 
       expect(response.status).toBe(200);
-      expect(coreApi.requests.map((upstream) => upstream.headers.authorization)).toEqual([bearer('session-42'), bearer('session-42')]);
+      expect(coreApi.requests.map((upstream) => upstream.headers.authorization)).toEqual(Array(4).fill(bearer('session-42')));
     });
 
     test.each(BFF_ROUTES)('$method $path answers 503 when Core API is not configured', async (route) => {
@@ -142,8 +159,14 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expectBffContract('get', '/settings/bootstrap', response);
       expect(response.headers['cache-control']).toBe('no-store');
       // Core's groups, role and status do not leave the BFF.
-      expect(response.body).toEqual({ profile: profileOf(me), sessions, sources: { sessions: 'available' } });
-      expect(upstreamSequence()).toEqual([called('GET', coreApiUrls.getGetMeUrl()), called('GET', coreApiUrls.getGetActiveSessionsUrl())]);
+      expect(response.body).toEqual({ profile: profileOf(me), sessions, ...STORED, sources: ALL_AVAILABLE });
+      // The profile first (required), then the optional reads in parallel.
+      expect(upstreamSequence()[0]).toBe(called('GET', coreApiUrls.getGetMeUrl()));
+      expect(upstreamSequence().slice(1).sort()).toEqual([
+        called('GET', coreApiUrls.getGetActiveSessionsUrl()),
+        called('GET', coreApiUrls.getGetMyNotificationSettingsUrl()),
+        called('GET', coreApiUrls.getGetMyPreferencesUrl()),
+      ].sort());
       for (const upstream of coreApi.requests) {
         expect(upstream.headers.authorization).toBe(bearer('session-42'));
         expect(upstream.headers.accept).toBe('application/json');
@@ -177,7 +200,9 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       const missingPhone = await withSession(request(app).get('/settings/bootstrap'));
       expect(missingPhone.status).toBe(200);
       expectBffContract('get', '/settings/bootstrap', missingPhone);
-      expect(missingPhone.body).toEqual({ profile: { first_name: me.first_name, last_name: me.last_name, email: me.email }, sessions: [], sources: { sessions: 'available' } });
+      expect(missingPhone.body).toEqual({
+        profile: { first_name: me.first_name, last_name: me.last_name, email: me.email }, sessions: [], ...STORED, sources: ALL_AVAILABLE,
+      });
     });
 
     test.each<[string, MockReply]>([
@@ -195,7 +220,61 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
 
       expect(response.status).toBe(200);
       expectBffContract('get', '/settings/bootstrap', response);
-      expect(response.body).toEqual({ profile: profileOf(me), sessions: [], sources: { sessions: 'unavailable' } });
+      expect(response.body).toEqual({ profile: profileOf(me), sessions: [], ...STORED, sources: { ...ALL_AVAILABLE, sessions: 'unavailable' } });
+    });
+
+    test.each<[string, MockReply]>([
+      ['a Core 500', coreError(500)],
+      ['a Core 401', coreError(401, '')],
+      ['an unknown theme', { body: { theme: 'neon' }, outOfContract: true }],
+      ['invalid JSON', { raw: '{"theme": ', outOfContract: true }],
+      ['a dropped connection', { dropConnection: true }],
+    ])('marks the preferences unavailable on %s and keeps the rest', async (_label, reply) => {
+      const me = meResponse();
+      coreApi.on('get', CORE.me, { body: me }).on('get', CORE.sessions, { body: sessionsResult([]) }).on('get', CORE.preferences, reply);
+
+      const response = await withSession(request(app).get('/settings/bootstrap'));
+
+      expect(response.status).toBe(200);
+      expectBffContract('get', '/settings/bootstrap', response);
+      expect(response.body).toEqual({
+        profile: profileOf(me), sessions: [], appearance: null, general: null, notifications: STORED.notifications,
+        sources: { ...ALL_AVAILABLE, preferences: 'unavailable' },
+      });
+    });
+
+    test.each<[string, MockReply]>([
+      ['a Core 500', coreError(500)],
+      ['a non-boolean setting', { body: { email: 'yes' }, outOfContract: true }],
+      ['a dropped connection', { dropConnection: true }],
+    ])('marks the notification settings unavailable on %s and keeps the rest', async (_label, reply) => {
+      const me = meResponse();
+      coreApi.on('get', CORE.me, { body: me }).on('get', CORE.sessions, { body: sessionsResult([]) }).on('get', CORE.notifications, reply);
+
+      const response = await withSession(request(app).get('/settings/bootstrap'));
+
+      expect(response.status).toBe(200);
+      expectBffContract('get', '/settings/bootstrap', response);
+      expect(response.body).toEqual({
+        profile: profileOf(me), sessions: [], appearance: STORED.appearance, general: STORED.general, notifications: null,
+        sources: { ...ALL_AVAILABLE, notifications: 'unavailable' },
+      });
+    });
+
+    test('answers null for the preferences a user never saved (application defaults)', async () => {
+      coreApi
+        .on('get', CORE.me, { body: meResponse() })
+        .on('get', CORE.sessions, { body: sessionsResult([]) })
+        .on('get', CORE.preferences, { body: { theme: null, font_size: 14 } })
+        .on('get', CORE.notifications, { body: {} });
+
+      const response = await withSession(request(app).get('/settings/bootstrap'));
+
+      expect(response.status).toBe(200);
+      expectBffContract('get', '/settings/bootstrap', response);
+      expect(response.body.appearance).toEqual({ theme: null, font_family: null, font_size: 14, density: null });
+      expect(response.body.general).toEqual({ language: null, timezone: null, date_format: null, home_page: null, auto_open_notifications: null });
+      expect(response.body.notifications).toEqual({ email: null, push: null, desktop: null, messages: null, projects: null, calendar: null });
     });
 
     test('preserves a Core 401 on the profile without reading sessions', async () => {
@@ -469,16 +548,80 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
     });
   });
 
-  describe('PATCH /settings/{notifications,appearance,general}', () => {
-    test.each(PREFERENCE_TARGETS)('/settings/$section answers 404 without calling Core API and never fabricates a save', async ({ section }) => {
-      const response = await withSession(request(app).patch(`/settings/${section}`).send({ theme: 'dark', emailDigest: false }));
+  describe('PATCH /settings/{appearance,general,notifications}', () => {
+    const PATCHES = {
+      appearance: { theme: 'light', font_size: 18 },
+      general: { language: 'en', auto_open_notifications: true, home_page: null },
+      notifications: { email: false, calendar: true, push: null },
+    } as const;
 
-      expect(response.status).toBe(404);
+    test.each(PREFERENCE_SECTIONS)('/settings/$section sends the patch to PATCH $template and answers the stored section', async ({ section, template, fields }) => {
+      const patch = PATCHES[section];
+      const stored: Record<string, unknown> = { ...(template === CORE.preferences ? preferences() : notificationSettings()), ...patch };
+      coreApi.on('patch', template, { body: stored });
+
+      const response = await withSession(request(app).patch(`/settings/${section}`).send(patch), 'session-42');
+
+      expect(response.status).toBe(200);
       expectBffContract('patch', `/settings/${section}`, response);
-      expect(response.type).toBe('application/json');
       expect(response.headers['cache-control']).toBe('no-store');
-      expect(response.body).toEqual({ error: { code: 'NOT_FOUND', message: 'This preference is not handled by Core API yet.', details: [] } });
-      expect(coreApi.requests).toEqual([]);
+      expect(response.body).toEqual(Object.fromEntries(fields.map((field) => [field, stored[field] ?? null])));
+      expect(upstreamSequence()).toEqual([called('PATCH', template)]);
+      const [sent] = coreApi.requests;
+      expect(sent.body).toEqual(patch);
+      expect(sent.headers.authorization).toBe(bearer('session-42'));
+    });
+
+    test.each([
+      ['appearance', 'an empty body', {}],
+      ['appearance', 'a field of another section', { language: 'fr' }],
+      ['appearance', 'an unknown theme', { theme: 'neon' }],
+      ['appearance', 'a font size out of range', { font_size: 40000 }],
+      ['appearance', 'a decimal font size', { font_size: 12.5 }],
+      ['appearance', 'a blank font family', { font_family: '   ' }],
+      ['appearance', 'a density longer than 32 characters', { density: 'x'.repeat(33) }],
+      ['general', 'an empty body', {}],
+      ['general', 'a field of another section', { theme: 'dark' }],
+      ['general', 'a language longer than 16 characters', { language: 'x'.repeat(17) }],
+      ['general', 'a control character', { timezone: 'Europe/\u0000Paris' }],
+      ['general', 'a non-boolean flag', { auto_open_notifications: 'yes' }],
+      ['notifications', 'an empty body', {}],
+      ['notifications', 'an unknown channel', { sms: true }],
+      ['notifications', 'a non-boolean setting', { email: 'yes' }],
+      ['notifications', 'a JSON array', [{ email: true }]],
+    ])('/settings/%s rejects %s with 400 without calling Core', async (section, _label, body) => {
+      const response = await withSession(request(app).patch(`/settings/${section}`).send(body));
+
+      expect(response.status).toBe(400);
+      expectBffContract('patch', `/settings/${section}`, response);
+      expect(response.body.error).toMatchObject({ code: 'BAD_REQUEST', message: 'Validation failed' });
+      expect(coreApi.requests).toHaveLength(0);
+    });
+
+    test.each<[string, MockReply, number, string]>([
+      ['a Core 400', coreError(400, 'Invalid `theme`'), 400, 'BAD_REQUEST'],
+      ['a Core 401', coreError(401, ''), 401, 'UNAUTHORIZED'],
+      ['an undeclared Core 404', coreError(404, 'Not Found'), 502, 'BAD_GATEWAY'],
+      ['a Core 500', coreError(500), 502, 'BAD_GATEWAY'],
+      ['an invalid answer', { body: { theme: 'neon' }, outOfContract: true }, 502, 'BAD_GATEWAY'],
+    ])('maps %s on PATCH /settings/appearance without retrying', async (_label, reply, status, code) => {
+      coreApi.on('patch', CORE.preferences, reply);
+
+      const response = await withSession(request(app).patch('/settings/appearance').send({ theme: 'dark' }));
+
+      expect(response.status).toBe(status);
+      expectBffContract('patch', '/settings/appearance', response);
+      expect(response.body.error.code).toBe(code);
+      expect(JSON.stringify(response.body)).not.toMatch(/database/);
+      expect(coreApi.calls(CORE.preferences, 'patch')).toHaveLength(1);
+    });
+
+    test.each(PREFERENCE_SECTIONS)('/settings/$section answers 401 without calling Core and no session', async ({ section }) => {
+      const response = await request(app).patch(`/settings/${section}`).send({});
+
+      expect(response.status).toBe(401);
+      expectBffContract('patch', `/settings/${section}`, response);
+      expect(coreApi.requests).toHaveLength(0);
     });
   });
 

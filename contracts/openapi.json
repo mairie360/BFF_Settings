@@ -167,6 +167,296 @@
         },
         "additionalProperties": false
       },
+      "SettingsAppearance": {
+        "type": "object",
+        "properties": {
+          "theme": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "light",
+              "dark",
+              "system",
+              null
+            ],
+            "example": "dark"
+          },
+          "font_family": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Marianne"
+          },
+          "font_size": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "example": 16
+          },
+          "density": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "compact"
+          }
+        },
+        "required": [
+          "theme",
+          "font_family",
+          "font_size",
+          "density"
+        ]
+      },
+      "SettingsAppearancePatch": {
+        "type": "object",
+        "properties": {
+          "theme": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "light",
+              "dark",
+              "system",
+              null
+            ],
+            "example": "dark"
+          },
+          "font_family": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128,
+            "pattern": "\\S",
+            "example": "Marianne"
+          },
+          "font_size": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 32767,
+            "example": 16
+          },
+          "density": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 32,
+            "pattern": "\\S",
+            "example": "compact"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SettingsGeneral": {
+        "type": "object",
+        "properties": {
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "fr"
+          },
+          "timezone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Europe/Paris"
+          },
+          "date_format": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "DD/MM/YYYY"
+          },
+          "home_page": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "/dashboard"
+          },
+          "auto_open_notifications": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "example": false
+          }
+        },
+        "required": [
+          "language",
+          "timezone",
+          "date_format",
+          "home_page",
+          "auto_open_notifications"
+        ]
+      },
+      "SettingsGeneralPatch": {
+        "type": "object",
+        "properties": {
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 16,
+            "pattern": "\\S",
+            "example": "fr"
+          },
+          "timezone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64,
+            "pattern": "\\S",
+            "example": "Europe/Paris"
+          },
+          "date_format": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 32,
+            "pattern": "\\S",
+            "example": "DD/MM/YYYY"
+          },
+          "home_page": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128,
+            "pattern": "\\S",
+            "example": "/dashboard"
+          },
+          "auto_open_notifications": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "example": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "SettingsNotifications": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "example": true
+          },
+          "push": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "example": false
+          },
+          "desktop": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "example": true
+          },
+          "messages": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "example": true
+          },
+          "projects": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "example": true
+          },
+          "calendar": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "example": false
+          }
+        },
+        "required": [
+          "email",
+          "push",
+          "desktop",
+          "messages",
+          "projects",
+          "calendar"
+        ]
+      },
+      "SettingsNotificationsPatch": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "example": true
+          },
+          "push": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "example": false
+          },
+          "desktop": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "example": true
+          },
+          "messages": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "example": true
+          },
+          "projects": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "example": true
+          },
+          "calendar": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "example": false
+          }
+        },
+        "additionalProperties": false
+      },
       "SettingsBootstrap": {
         "type": "object",
         "properties": {
@@ -209,6 +499,36 @@
               ]
             }
           },
+          "appearance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SettingsAppearance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "general": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SettingsGeneral"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notifications": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SettingsNotifications"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sources": {
             "type": "object",
             "properties": {
@@ -218,16 +538,35 @@
                   "available",
                   "unavailable"
                 ]
+              },
+              "preferences": {
+                "type": "string",
+                "enum": [
+                  "available",
+                  "unavailable"
+                ]
+              },
+              "notifications": {
+                "type": "string",
+                "enum": [
+                  "available",
+                  "unavailable"
+                ]
               }
             },
             "required": [
-              "sessions"
+              "sessions",
+              "preferences",
+              "notifications"
             ]
           }
         },
         "required": [
           "profile",
           "sessions",
+          "appearance",
+          "general",
+          "notifications",
           "sources"
         ]
       }
@@ -302,7 +641,7 @@
       "get": {
         "responses": {
           "200": {
-            "description": "Core profile and sessions of the signed-in user",
+            "description": "Core profile, sessions, preferences and notification settings of the signed-in user",
             "content": {
               "application/json": {
                 "schema": {
@@ -430,84 +769,6 @@
         }
       }
     },
-    "/settings/notifications": {
-      "patch": {
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": {}
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Preferences saved by Core",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": {}
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Unparsable request body",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid session",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not available in Core yet",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Core is unavailable, failed or answered an unexpected status",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Core is not configured",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/settings/appearance": {
       "patch": {
         "requestBody": {
@@ -515,26 +776,24 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": {}
+                "$ref": "#/components/schemas/SettingsAppearancePatch"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Preferences saved by Core",
+            "description": "appearance settings saved by Core",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {}
+                  "$ref": "#/components/schemas/SettingsAppearance"
                 }
               }
             }
           },
           "400": {
-            "description": "Unparsable request body",
+            "description": "Invalid or unsupported fields",
             "content": {
               "application/json": {
                 "schema": {
@@ -545,16 +804,6 @@
           },
           "401": {
             "description": "Invalid session",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not available in Core yet",
             "content": {
               "application/json": {
                 "schema": {
@@ -593,26 +842,24 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": {}
+                "$ref": "#/components/schemas/SettingsGeneralPatch"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Preferences saved by Core",
+            "description": "general settings saved by Core",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {}
+                  "$ref": "#/components/schemas/SettingsGeneral"
                 }
               }
             }
           },
           "400": {
-            "description": "Unparsable request body",
+            "description": "Invalid or unsupported fields",
             "content": {
               "application/json": {
                 "schema": {
@@ -631,8 +878,64 @@
               }
             }
           },
-          "404": {
-            "description": "Not available in Core yet",
+          "502": {
+            "description": "Core is unavailable, failed or answered an unexpected status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings/notifications": {
+      "patch": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsNotificationsPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "notifications settings saved by Core",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsNotifications"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or unsupported fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid session",
             "content": {
               "application/json": {
                 "schema": {

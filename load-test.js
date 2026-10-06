@@ -43,14 +43,9 @@ function mintJwt(sub, role) {
   return `${signingInput}.${signature}`;
 }
 
-// The BFF does not relay the Core API preference operations yet (Core API 2.0 exposes them): it answers
-// the documented 404 on these sections. Only that 404 is accepted.
-const preferenceStatuses = { responseCallback: http.expectedStatuses(200, 404) };
+// The preference sections are relayed to Core API (preferences / notification settings of user 2).
 function preferenceHandler(section, body) {
-  return ({ request }) =>
-    check(request({ body, params: preferenceStatuses }), {
-      [`${section} 200 (404: not in Core yet)`]: (r) => r.status === 200 || r.status === 404,
-    });
+  return ({ request }) => check(request({ body }), { [`${section} 200`]: (r) => r.status === 200 });
 }
 
 const handlers = {

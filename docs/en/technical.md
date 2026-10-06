@@ -6,13 +6,13 @@
 
 Express 5.1.0 server written in TypeScript. Zod schemas and their OpenAPI registry describe exchanged objects; routers adapt upstream services to interface needs.
 
-Bootstrap validates the required profile and loads sessions separately. Profile mutation rejects unknown fields and empty bodies, sends a PATCH to Core, then reads the profile again. Notification preferences target `/notification-settings/`; appearance and general share `/preferences/`.
+Bootstrap validates the required profile, then loads sessions, preferences (`appearance`, `general`) and notification settings in parallel; each optional read that fails is `null` (sessions: empty) and marked `unavailable` in `sources`. Profile mutation rejects unknown fields and empty bodies, sends a PATCH to Core, then reads the profile again. Preference sections relay Core API 2.0: `PATCH /settings/appearance` (`theme` `light`/`dark`/`system`, `font_family`, `font_size`, `density`) and `PATCH /settings/general` (`language`, `timezone`, `date_format`, `home_page`, `auto_open_notifications`) share Core `/api/v1/user/me/preferences/`; `PATCH /settings/notifications` (`email`, `push`, `desktop`, `messages`, `projects`, `calendar`, booleans) targets `/api/v1/user/me/notifications/`. Each section only accepts its own fields (an unknown field or an empty body is a 400), follows the Core rules (texts 1 to 16/32/64/128 characters, not blank, without control characters; `font_size` 1 to 32767), accepts `null` to reset a field to the application default, and answers its fields as stored by Core (`null` = default).
 
 ## Data and persistence
 
 The profile comes from Core `/api/v1/user/me/`; sessions come from `/api/v1/sessions/`. Fields are `first_name`, `last_name`, `email` and `phone`. The session schema retains displayable information and removes internal fields. The BFF stores no preferences locally.
 
-The web service’s notifications, appearance, general and system panels currently report unavailability. Security displays sessions without managing other settings. Preference adapters do not guarantee that the corresponding Core routes are deployed.
+The system panel of the web service reports unavailability. Security displays sessions without managing other settings.
 
 ## Installation and local startup
 
@@ -66,9 +66,9 @@ Inventory extracted from `contracts/openapi.json`. Replace brace parameters with
 | GET | `/check_apis` | — | 200, 502 |
 | GET | `/settings/bootstrap` | — | 200, 401, 502, 503 |
 | PATCH | `/settings/profile` | application/json | 200, 400, 401, 403, 409, 502, 503 |
-| PATCH | `/settings/notifications` | application/json | 200, 400, 401, 404, 502, 503 |
-| PATCH | `/settings/appearance` | application/json | 200, 400, 401, 404, 502, 503 |
-| PATCH | `/settings/general` | application/json | 200, 400, 401, 404, 502, 503 |
+| PATCH | `/settings/notifications` | application/json | 200, 400, 401, 502, 503 |
+| PATCH | `/settings/appearance` | application/json | 200, 400, 401, 502, 503 |
+| PATCH | `/settings/general` | application/json | 200, 400, 401, 502, 503 |
 
 ## Session, permissions and errors
 
@@ -84,7 +84,7 @@ npm run lint
 npm run build
 ```
 
-The tests in `tests/settings.upstream-mocks.test.ts` run the whole application with the real `fetch` client against a local HTTP server simulating Core API. Its contract is rebuilt from the installed `@mairie360/core-api-openapi` package (orval types, version pinned in `package.json`): every outgoing request (path, parameters, JSON body) and every mocked success response is validated against that contract, and every BFF response against `contracts/openapi.json`. Bumping the package version is enough to test the new contract; error statuses are not typed by orval and are simulated explicitly. `tests/upstream-contracts.test.ts` pins the version, the consumed operations and the known gaps (preference routes not relayed to Core).
+The tests in `tests/settings.upstream-mocks.test.ts` run the whole application with the real `fetch` client against a local HTTP server simulating Core API. Its contract is rebuilt from the installed `@mairie360/core-api-openapi` package (orval types, version pinned in `package.json`): every outgoing request (path, parameters, JSON body) and every mocked success response is validated against that contract, and every BFF response against `contracts/openapi.json`. Bumping the package version is enough to test the new contract; error statuses are not typed by orval and are simulated explicitly. `tests/upstream-contracts.test.ts` pins the version, the consumed operations and the preference operations.
 
 `contracts:generate` exports the runtime registry to `contracts/openapi.json` and regenerates `contracts/bff.d.ts`. `contracts:check` fails when the contract or types are stale. Then run `npm run contracts:sync` in each associated web service and deliver contract changes together.
 

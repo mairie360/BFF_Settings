@@ -1,4 +1,4 @@
-import { HttpError, asCaller, callUpstream, parseRequest, requireBearer, validationError } from '@mairie360/bffs-lib';
+import { asCaller, callUpstream, parseRequest, requireBearer, validationError } from '@mairie360/bffs-lib';
 import { Router, type Request } from 'express';
 import { z } from 'zod';
 import { registry, ErrorSchema } from '../openapi-registry';
@@ -6,7 +6,6 @@ import type { PatchMeView } from '@mairie360/core-api-openapi/model';
 import { coreApi } from '../clients/coreClient';
 
 const errorContent = { content: { 'application/json': { schema: ErrorSchema } } };
-const passthroughContent = { content: { 'application/json': { schema: z.record(z.string(), z.unknown()) } } };
 // Common error answers: session refused (BFF or Core), Core failure (network, 5xx, undeclared 4xx or
 // invalid answer), Core not configured.
 const upstreamErrors = {
@@ -51,12 +50,81 @@ const PROFILE_FIELDS = ['first_name', 'last_name', 'email', 'phone'] as const;
 const SessionSchema = z.object({
   id: z.string(), device_info: z.string(), ip_address: z.string(), created_at: z.string(), expires_at: z.string(), revoked_at: z.string().nullable().optional(),
 });
+
+// Preferences and notification settings stored by Core API (`/api/v1/user/me/preferences/` and
+// `/api/v1/user/me/notifications/`). Every field is nullable: `null` means "application default", and
+// a PATCH with `null` resets the field to it. Edits mirror the Core rules (MAIR-205).
+const THEMES = ['light', 'dark', 'system'] as const;
+/** Core `check_text`: 1 to `max` characters, not blank, no control character. */
+const PreferenceText = (max: number) => z.string().max(max)
+  .regex(/\S/, 'Must not be blank')
+  // Unicode Cc, like Rust `char::is_control`. The OpenAPI document only keeps the first pattern (`\S`).
+  .regex(/^\P{Cc}*$/u, 'Must not contain control characters');
+const FontSize = z.number().int().min(1).max(32767);
+const APPEARANCE_FIELDS = ['theme', 'font_family', 'font_size', 'density'] as const;
+const GENERAL_FIELDS = ['language', 'timezone', 'date_format', 'home_page', 'auto_open_notifications'] as const;
+const NOTIFICATION_FIELDS = ['email', 'push', 'desktop', 'messages', 'projects', 'calendar'] as const;
+
+export const AppearanceSchema = registry.register('SettingsAppearance', z.object({
+  theme: z.enum(THEMES).nullable().openapi({ example: 'dark' }),
+  font_family: z.string().nullable().openapi({ example: 'Marianne' }),
+  font_size: z.number().int().nullable().openapi({ example: 16 }),
+  density: z.string().nullable().openapi({ example: 'compact' }),
+}));
+export const AppearancePatchSchema = registry.register('SettingsAppearancePatch', z.object({
+  theme: z.enum(THEMES).nullable().openapi({ example: 'dark' }),
+  font_family: PreferenceText(128).nullable().openapi({ example: 'Marianne' }),
+  font_size: FontSize.nullable().openapi({ example: 16 }),
+  density: PreferenceText(32).nullable().openapi({ example: 'compact' }),
+}).partial().strict());
+export const GeneralSchema = registry.register('SettingsGeneral', z.object({
+  language: z.string().nullable().openapi({ example: 'fr' }),
+  timezone: z.string().nullable().openapi({ example: 'Europe/Paris' }),
+  date_format: z.string().nullable().openapi({ example: 'DD/MM/YYYY' }),
+  home_page: z.string().nullable().openapi({ example: '/dashboard' }),
+  auto_open_notifications: z.boolean().nullable().openapi({ example: false }),
+}));
+export const GeneralPatchSchema = registry.register('SettingsGeneralPatch', z.object({
+  language: PreferenceText(16).nullable().openapi({ example: 'fr' }),
+  timezone: PreferenceText(64).nullable().openapi({ example: 'Europe/Paris' }),
+  date_format: PreferenceText(32).nullable().openapi({ example: 'DD/MM/YYYY' }),
+  home_page: PreferenceText(128).nullable().openapi({ example: '/dashboard' }),
+  auto_open_notifications: z.boolean().nullable().openapi({ example: false }),
+}).partial().strict());
+const notificationFlags = (optional: boolean) => {
+  const flag = (example: boolean) => (optional ? z.boolean().nullable().optional() : z.boolean().nullable()).openapi({ example });
+  return {
+    email: flag(true), push: flag(false), desktop: flag(true), messages: flag(true), projects: flag(true), calendar: flag(false),
+  };
+};
+export const NotificationsSchema = registry.register('SettingsNotifications', z.object(notificationFlags(false)));
+export const NotificationsPatchSchema = registry.register('SettingsNotificationsPatch', z.object(notificationFlags(true)).strict());
+
+// Core answers (`UserPreferences`, `UserNotificationSettings`): every field optional and nullable.
+const CorePreferencesSchema = z.object({
+  theme: z.enum(THEMES).nullish(), font_family: z.string().nullish(), font_size: z.number().int().nullish(), density: z.string().nullish(),
+  language: z.string().nullish(), timezone: z.string().nullish(), date_format: z.string().nullish(), home_page: z.string().nullish(),
+  auto_open_notifications: z.boolean().nullish(),
+});
+const CoreNotificationsSchema = z.object(Object.fromEntries(NOTIFICATION_FIELDS.map((field) => [field, z.boolean().nullish()])));
+
+/** The `fields` of a Core answer, a missing field being `null` (application default). */
+function pick<K extends string>(fields: readonly K[], source: Partial<Record<K, unknown>>) {
+  return Object.fromEntries(fields.map((field) => [field, source[field] ?? null]));
+}
+
+const availability = z.enum(['available', 'unavailable']);
 export const BootstrapSchema = registry.register('SettingsBootstrap', z.object({
   profile: ProfileSchema, sessions: z.array(SessionSchema),
-  sources: z.object({ sessions: z.enum(['available', 'unavailable']) }),
+  // `null` when Core could not be read (see `sources`). A union, not `.nullable()`: zod-to-openapi turns a
+  // nullable registered schema into an `allOf` that refuses `null`.
+  appearance: z.union([AppearanceSchema, z.null()]),
+  general: z.union([GeneralSchema, z.null()]),
+  notifications: z.union([NotificationsSchema, z.null()]),
+  sources: z.object({ sessions: availability, preferences: availability, notifications: availability }),
 }));
 registry.registerPath({ method: 'get', path: '/settings/bootstrap', responses: {
-  200: { description: 'Core profile and sessions of the signed-in user', content: { 'application/json': { schema: BootstrapSchema } } },
+  200: { description: 'Core profile, sessions, preferences and notification settings of the signed-in user', content: { 'application/json': { schema: BootstrapSchema } } },
   ...upstreamErrors, 502: { description: 'Profile unavailable', ...errorContent },
 } });
 const SessionsResultSchema = z.object({ sessions: z.array(SessionSchema) });
@@ -70,19 +138,32 @@ async function readProfile(req: Request) {
   );
 }
 
+/** An optional Core read: `undefined` when it fails, so the bootstrap still answers the profile. */
+async function optionalRead<T>(read: () => Promise<T>): Promise<T | undefined> {
+  try {
+    return await callUpstream('CORE_API', read, { retry: true });
+  } catch {
+    return undefined;
+  }
+}
+
 router.get('/bootstrap', async (req, res) => {
   const profile = await readProfile(req);
-  let sessions: z.infer<typeof SessionSchema>[] = [];
-  let sessionSource: 'available' | 'unavailable' = 'unavailable';
-  try {
-    sessions = await callUpstream(
-      'CORE_API',
-      async () => SessionsResultSchema.parse((await coreApi.getActiveSessions(asCaller('CORE_API', req))).data).sessions,
-      { retry: true },
-    );
-    sessionSource = 'available';
-  } catch { /* Session availability is separate from profile availability. */ }
-  return res.json(BootstrapSchema.parse({ profile, sessions, sources: { sessions: sessionSource } }));
+  // Sessions, preferences and notification settings are optional: each failure only marks its source.
+  const [sessions, preferences, notifications] = await Promise.all([
+    optionalRead(async () => SessionsResultSchema.parse((await coreApi.getActiveSessions(asCaller('CORE_API', req))).data).sessions),
+    optionalRead(async () => CorePreferencesSchema.parse((await coreApi.getMyPreferences(asCaller('CORE_API', req))).data)),
+    optionalRead(async () => CoreNotificationsSchema.parse((await coreApi.getMyNotificationSettings(asCaller('CORE_API', req))).data)),
+  ]);
+  const source = (value: unknown) => (value === undefined ? 'unavailable' : 'available');
+  return res.json(BootstrapSchema.parse({
+    profile,
+    sessions: sessions ?? [],
+    appearance: preferences ? pick(APPEARANCE_FIELDS, preferences) : null,
+    general: preferences ? pick(GENERAL_FIELDS, preferences) : null,
+    notifications: notifications ? pick(NOTIFICATION_FIELDS, notifications) : null,
+    sources: { sessions: source(sessions), preferences: source(preferences), notifications: source(notifications) },
+  }));
 });
 registry.registerPath({ method: 'patch', path: '/settings/profile', request: {
   body: { required: true, content: { 'application/json': { schema: ProfilePatchSchema } } },
@@ -121,20 +202,43 @@ router.patch('/profile', async (req, res) => {
   return res.json(await readProfile(req));
 });
 
-// Core API exposes no preference operation: these sections answer 404 and never fake a local save.
-// They will relay Core as soon as it publishes the matching operations.
-const preferences = ['notifications', 'appearance', 'general'] as const;
-for (const section of preferences) {
+// Preference sections: each one only accepts its own fields (unknown field: 400, at least one field),
+// PATCHes Core and answers the section as stored by Core. The sections `appearance` and `general`
+// share Core's preferences.
+const sections = [
+  {
+    section: 'appearance', fields: APPEARANCE_FIELDS, patchSchema: AppearancePatchSchema, schema: AppearanceSchema,
+    save: (req: Request, patch: object) => coreApi.patchMyPreferences(patch, asCaller('CORE_API', req)), answer: CorePreferencesSchema,
+  },
+  {
+    section: 'general', fields: GENERAL_FIELDS, patchSchema: GeneralPatchSchema, schema: GeneralSchema,
+    save: (req: Request, patch: object) => coreApi.patchMyPreferences(patch, asCaller('CORE_API', req)), answer: CorePreferencesSchema,
+  },
+  {
+    section: 'notifications', fields: NOTIFICATION_FIELDS, patchSchema: NotificationsPatchSchema, schema: NotificationsSchema,
+    save: (req: Request, patch: object) => coreApi.patchMyNotificationSettings(patch, asCaller('CORE_API', req)), answer: CoreNotificationsSchema,
+  },
+] as const;
+for (const { section, fields, patchSchema, schema, save, answer } of sections) {
   registry.registerPath({ method: 'patch', path: `/settings/${section}`, request: {
-    body: { required: true, content: { 'application/json': { schema: z.record(z.string(), z.unknown()) } } },
+    body: { required: true, content: { 'application/json': { schema: patchSchema } } },
   }, responses: {
-    200: { description: 'Preferences saved by Core', ...passthroughContent },
-    400: { description: 'Unparsable request body', ...errorContent },
-    404: { description: 'Not available in Core yet', ...errorContent },
+    200: { description: `${section} settings saved by Core`, content: { 'application/json': { schema } } },
+    400: { description: 'Invalid or unsupported fields', ...errorContent },
     ...upstreamErrors,
   } });
-  router.patch(`/${section}`, () => {
-    throw new HttpError(404, 'This preference is not handled by Core API yet.');
+  router.patch(`/${section}`, async (req, res) => {
+    const patch: Record<string, unknown> = parseRequest(patchSchema, req.body, 'body');
+    if (!Object.keys(patch).length) {
+      throw validationError('body', [{ path: [], message: `Expected at least one of ${fields.join(', ')}` }]);
+    }
+    // Not retried: only idempotent reads are.
+    const stored = await callUpstream(
+      'CORE_API',
+      async () => answer.parse((await save(req, patch)).data) as Record<string, unknown>,
+      { declared: [400, 401] },
+    );
+    return res.json(schema.parse(pick(fields, stored)));
   });
 }
 export default router;

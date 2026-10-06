@@ -63,15 +63,20 @@ and `requireBearer` (401 before any Core call without `Authorization: Bearer <to
   without session (same `CORE_API_URL` as the real calls), returns 200 or 502 with the `CheckApisResponse`
   schema (`checkApisResponseSchema(['core_api'])`). Add a probe for any new upstream.
 - `routes/settings.ts` — the real work:
-  - `GET /settings/bootstrap` aggregates Core `/api/v1/user/me/` (required; failure = error) and
-    `/api/v1/sessions/` (optional; failure sets `sources.sessions: 'unavailable'`). Session objects
-    are re-parsed through a Zod schema, which strips internal fields like `token_hash`.
+  - `GET /settings/bootstrap` aggregates Core `/api/v1/user/me/` (required; failure = error), then in
+    parallel `/api/v1/sessions/`, `/api/v1/user/me/preferences/` and `/api/v1/user/me/notifications/`
+    (optional; a failure sets `sources.{sessions,preferences,notifications}: 'unavailable'` and the section
+    to `null`). Session objects are re-parsed through a Zod schema, which strips internal fields like `token_hash`.
   - `PATCH /settings/profile` validates with the lib's `parseRequest(ProfilePatchSchema, req.body, 'body')`
     (`.strict()`: unknown fields are a 400 `Validation failed` with `body.<field>` details) and refuses an
     empty patch with the same 400 (never a silent success), PATCHes Core, then **re-reads** and returns the
-    persisted profile.
-  - `PATCH /settings/{notifications,appearance,general}` answer 404 without calling Core (Core serves
-    neither `notification-settings/` nor `preferences/`) and never fabricate a local save.
+    persisted profile. When `email` is sent it first reads the profile: an unchanged address (trimmed,
+    case-insensitive) is dropped, since the front always sends it; only a real change needs `current_password`
+    (Core API 2.0, MAIR-390), and a patch left empty answers the current profile without PATCH.
+  - `PATCH /settings/{appearance,general}` relay Core `PATCH /api/v1/user/me/preferences/` and
+    `PATCH /settings/notifications` relays `PATCH /api/v1/user/me/notifications/`: strict per-section schemas
+    mirroring the Core rules (unknown field or empty body: 400; `null` resets to the default), answer the
+    section's fields from Core's answer (missing = `null`).
   - Every `/settings` route documents 401/502/503 through `upstreamErrors`; the contract tests fail on
     any status the route can return but does not declare.
 
@@ -100,9 +105,9 @@ schema), so an undocumented status fails the test. `tests/upstream-contracts.tes
 version, the consumed operations, BFF↔Core schema compatibility and the known gaps.
 
 - `CORE_API_URL` / `CORE_API_PORT` are read per request, so tests set them in `beforeEach` (no module reload).
-- Known gaps are accepted with a justified `allowDeviation`: `GET /api/v1/sessions/` is typed by orval as the
-  roles `GetResponseView` (Core really returns `{ sessions }`), and the preference routes are absent from Core
-  (the mock answers 404, like Core). When a gap test in `upstream-contracts.test.ts` fails, remove the deviation.
+- A known gap can be accepted with a justified `allowDeviation`; none is needed with Core API 2.0.
+- `beforeEach` mocks Core preferences and notification settings with valid answers, because the bootstrap
+  reads them on every call; tests about them override these replies.
 - Fixtures live in `tests/support/core-fixtures.ts` and are validated against the contract.
 - `openapi-contract.ts`, `contract-mock-server.ts` and `orval-contract.ts` are shared verbatim with `BFF_user`,
   `BFF_Calendar`, `BFF_Dashboard`, `BFF_Elearning` and `BFF_Message`; keep the copies identical.
@@ -123,8 +128,7 @@ the BFF image named by `IMAGE_REF` (in CI, the image published by `release-dev`;
   every handler through `coverage.run()` (writes included, the profile patch restores the seed) and
   carries the coverage gate; `reads` (ramp to 20 VUs) replays the GET handlers. Thresholds: one
   `p(95)` per operation by family (`/health` 50 ms, `/check_apis` 150 ms, reads 400 ms, writes
-  800 ms), `http_req_failed < 1%`, `checks > 99%`. The three preference PATCHes accept their
-  documented 404 until Core API publishes preferences.
+  800 ms), `http_req_failed < 1%`, `checks > 99%`. The three preference PATCHes expect 200.
 - **Security** — OWASP ZAP imports `/openapi.json`, replays every operation with a static JWT via a
   header replacer, and fails on any alert not downgraded to `IGNORE` in `.zap/rules.tsv`. Expect one
   round of `rules.tsv` tuning after the first real run.

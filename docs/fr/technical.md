@@ -6,13 +6,13 @@
 
 Serveur Express 5.1.0 écrit en TypeScript. Les schémas Zod et leur registre OpenAPI décrivent les objets échangés; les routeurs adaptent les services amont aux besoins des interfaces.
 
-Le bootstrap valide le profil obligatoire et charge les sessions séparément. La mutation de profil rejette les champs inconnus et les corps vides, transmet un PATCH à Core puis relit le profil. Les préférences notifications ciblent `/notification-settings/`; apparence et général partagent `/preferences/`.
+Le bootstrap valide le profil obligatoire, puis charge en parallèle les sessions, les préférences (`appearance`, `general`) et les réglages de notifications ; chaque lecture facultative en échec vaut `null` (sessions : liste vide) et est marquée `unavailable` dans `sources`. La mutation de profil rejette les champs inconnus et les corps vides, transmet un PATCH à Core puis relit le profil. Les sections de préférences relaient Core API 2.0 : `PATCH /settings/appearance` (`theme` `light`/`dark`/`system`, `font_family`, `font_size`, `density`) et `PATCH /settings/general` (`language`, `timezone`, `date_format`, `home_page`, `auto_open_notifications`) partagent `/api/v1/user/me/preferences/` de Core ; `PATCH /settings/notifications` (`email`, `push`, `desktop`, `messages`, `projects`, `calendar`, booléens) cible `/api/v1/user/me/notifications/`. Chaque section n’accepte que ses propres champs (champ inconnu ou corps vide : 400), suit les règles de Core (textes de 1 à 16/32/64/128 caractères, non vides, sans caractère de contrôle ; `font_size` de 1 à 32767), accepte `null` pour revenir à la valeur par défaut de l’application et renvoie ses champs tels que Core les a enregistrés (`null` = valeur par défaut).
 
 ## Données et persistance
 
 Le profil vient de Core `/api/v1/user/me/`; les sessions viennent de `/api/v1/sessions/`. Les champs sont `first_name`, `last_name`, `email` et `phone`. Le schéma des sessions ne conserve que les informations affichables et retire les champs internes. Aucune préférence n’est stockée localement par le BFF.
 
-Les panneaux notifications, apparence, général et système du web service indiquent actuellement leur indisponibilité. La sécurité affiche les sessions, sans gérer les autres réglages. Les adaptateurs de préférences ne garantissent pas que les routes correspondantes soient déployées dans Core.
+Le panneau système du web service indique son indisponibilité. La sécurité affiche les sessions, sans gérer les autres réglages.
 
 ## Installation et lancement local
 
@@ -66,9 +66,9 @@ Inventaire extrait de `contracts/openapi.json`. Les paramètres entre accolades 
 | GET | `/check_apis` | — | 200, 502 |
 | GET | `/settings/bootstrap` | — | 200, 401, 502, 503 |
 | PATCH | `/settings/profile` | application/json | 200, 400, 401, 403, 409, 502, 503 |
-| PATCH | `/settings/notifications` | application/json | 200, 400, 401, 404, 502, 503 |
-| PATCH | `/settings/appearance` | application/json | 200, 400, 401, 404, 502, 503 |
-| PATCH | `/settings/general` | application/json | 200, 400, 401, 404, 502, 503 |
+| PATCH | `/settings/notifications` | application/json | 200, 400, 401, 502, 503 |
+| PATCH | `/settings/appearance` | application/json | 200, 400, 401, 502, 503 |
+| PATCH | `/settings/general` | application/json | 200, 400, 401, 502, 503 |
 
 ## Session, permissions et erreurs
 
@@ -84,7 +84,7 @@ npm run lint
 npm run build
 ```
 
-Les tests de `tests/settings.upstream-mocks.test.ts` exécutent toute l'application avec le vrai client `fetch` contre un serveur HTTP local simulant Core API. Son contrat est reconstruit depuis le paquet `@mairie360/core-api-openapi` installé (types orval, version épinglée dans `package.json`): chaque requête sortante (chemin, paramètres, corps JSON) et chaque réponse de succès simulée est validée contre ce contrat, et chaque réponse du BFF contre `contracts/openapi.json`. Monter la version du paquet suffit à tester le nouveau contrat; les statuts d'erreur ne sont pas typés par orval et sont simulés explicitement. `tests/upstream-contracts.test.ts` épingle la version, les opérations consommées et les écarts connus (routes de préférences non relayées vers Core).
+Les tests de `tests/settings.upstream-mocks.test.ts` exécutent toute l'application avec le vrai client `fetch` contre un serveur HTTP local simulant Core API. Son contrat est reconstruit depuis le paquet `@mairie360/core-api-openapi` installé (types orval, version épinglée dans `package.json`): chaque requête sortante (chemin, paramètres, corps JSON) et chaque réponse de succès simulée est validée contre ce contrat, et chaque réponse du BFF contre `contracts/openapi.json`. Monter la version du paquet suffit à tester le nouveau contrat; les statuts d'erreur ne sont pas typés par orval et sont simulés explicitement. `tests/upstream-contracts.test.ts` épingle la version, les opérations consommées et les opérations de préférences.
 
 `contracts:generate` exporte le registre runtime dans `contracts/openapi.json` et régénère `contracts/bff.d.ts`. `contracts:check` échoue si le contrat ou les types sont périmés. Exécuter ensuite `npm run contracts:sync` dans chaque web service associé et livrer les modifications de contrat ensemble.
 

@@ -1,5 +1,7 @@
 import { getCoreAPIMairie360 } from '@mairie360/core-api-openapi/endpoints/coreAPIMairie360';
-import type { GetMeResponseView, GetSessionsResultView, Group, PatchMeView, SessionSchema } from '@mairie360/core-api-openapi/model';
+import type {
+  GetMeResponseView, GetSessionsResultView, Group, PatchMeView, SessionSchema, UserNotificationSettings, UserPreferences,
+} from '@mairie360/core-api-openapi/model';
 
 // Réponses Core API typées par les modèles du paquet @mairie360/core-api-openapi installé : un champ ajouté,
 // retiré ou renommé par le contrat fait échouer la compilation des tests. Elles sont en plus validées à
@@ -55,13 +57,30 @@ export const sessionsResult = (sessions: SessionSchema[]): GetSessionsResultView
 /** Le BFF Settings ne vérifie que la forme `Bearer <jeton>` : le jeton est transmis tel quel à Core API (simulée). */
 export const bearer = (token = 'session-anne') => `Bearer ${token}`;
 
-/**
- * Core targets of the preference adapters (src/routes/settings.ts). None of them existed in Core API 1.2.0: the BFF
- * answers 404 without calling Core. upstream-contracts.test.ts checks that they stay absent; when it fails, Core
- * exposes them and the BFF must relay them (and the preference tests mock the real operation).
- */
-export const PREFERENCE_TARGETS = [
-  { section: 'notifications', template: '/api/v1/user/me/notifications/' },
-  { section: 'appearance', template: '/api/v1/user/me/preferences/' },
-  { section: 'general', template: '/api/v1/user/me/preferences/' },
+/** Body of `GET`/`PATCH /api/v1/user/me/preferences/` (UserPreferences). */
+export function preferences(overrides: Partial<UserPreferences> = {}): UserPreferences {
+  return {
+    theme: 'dark',
+    font_family: 'Marianne',
+    font_size: 16,
+    density: 'compact',
+    language: 'fr',
+    timezone: 'Europe/Paris',
+    date_format: 'DD/MM/YYYY',
+    home_page: '/dashboard',
+    auto_open_notifications: false,
+    ...overrides,
+  };
+}
+
+/** Body of `GET`/`PATCH /api/v1/user/me/notifications/` (UserNotificationSettings). */
+export function notificationSettings(overrides: Partial<UserNotificationSettings> = {}): UserNotificationSettings {
+  return { email: true, push: false, desktop: true, messages: true, projects: true, calendar: false, ...overrides };
+}
+
+/** BFF preference sections and the Core operations they relay to (src/routes/settings.ts). */
+export const PREFERENCE_SECTIONS = [
+  { section: 'appearance', template: '/api/v1/user/me/preferences/', fields: ['theme', 'font_family', 'font_size', 'density'] },
+  { section: 'general', template: '/api/v1/user/me/preferences/', fields: ['language', 'timezone', 'date_format', 'home_page', 'auto_open_notifications'] },
+  { section: 'notifications', template: '/api/v1/user/me/notifications/', fields: ['email', 'push', 'desktop', 'messages', 'projects', 'calendar'] },
 ] as const;
