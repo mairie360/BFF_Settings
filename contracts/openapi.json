@@ -251,8 +251,12 @@
               "string",
               "null"
             ],
-            "maxLength": 32,
-            "pattern": "\\S",
+            "enum": [
+              "compact",
+              "normal",
+              "comfortable",
+              null
+            ],
             "example": "compact"
           }
         },
@@ -313,8 +317,7 @@
               "string",
               "null"
             ],
-            "maxLength": 16,
-            "pattern": "\\S",
+            "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$",
             "example": "fr"
           },
           "timezone": {
@@ -331,8 +334,12 @@
               "string",
               "null"
             ],
-            "maxLength": 32,
-            "pattern": "\\S",
+            "enum": [
+              "DD/MM/YYYY",
+              "MM/DD/YYYY",
+              "YYYY-MM-DD",
+              null
+            ],
             "example": "DD/MM/YYYY"
           },
           "home_page": {

@@ -75,7 +75,9 @@ and `requireBearer` (401 before any Core call without `Authorization: Bearer <to
     (Core API 2.0, MAIR-390), and a patch left empty answers the current profile without PATCH.
   - `PATCH /settings/{appearance,general}` relay Core `PATCH /api/v1/user/me/preferences/` and
     `PATCH /settings/notifications` relays `PATCH /api/v1/user/me/notifications/`: strict per-section schemas
-    mirroring the Core rules (unknown field or empty body: 400; `null` resets to the default), answer the
+    mirroring the Core rules, stricter for `density`, `date_format` (the front's values) and `language` (language
+    code), which keeps ZAP's Path Traversal check from flagging free text (unknown field or empty body: 400;
+    `null` resets to the default), answer the
     section's fields from Core's answer (missing = `null`).
   - Every `/settings` route documents 401/502/503 through `upstreamErrors`; the contract tests fail on
     any status the route can return but does not declare.

@@ -543,8 +543,11 @@ export interface components {
             font_family?: string | null;
             /** @example 16 */
             font_size?: number | null;
-            /** @example compact */
-            density?: string | null;
+            /**
+             * @example compact
+             * @enum {string|null}
+             */
+            density?: "compact" | "normal" | "comfortable" | null;
         };
         SettingsGeneral: {
             /** @example fr */
@@ -563,8 +566,11 @@ export interface components {
             language?: string | null;
             /** @example Europe/Paris */
             timezone?: string | null;
-            /** @example DD/MM/YYYY */
-            date_format?: string | null;
+            /**
+             * @example DD/MM/YYYY
+             * @enum {string|null}
+             */
+            date_format?: "DD/MM/YYYY" | "MM/DD/YYYY" | "YYYY-MM-DD" | null;
             /** @example /dashboard */
             home_page?: string | null;
             /** @example false */

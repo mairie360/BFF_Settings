@@ -61,6 +61,12 @@ const PreferenceText = (max: number) => z.string().max(max)
   // Unicode Cc, like Rust `char::is_control`. The OpenAPI document only keeps the first pattern (`\S`).
   .regex(/^\P{Cc}*$/u, 'Must not contain control characters');
 const FontSize = z.number().int().min(1).max(32767);
+// The values the Settings front offers (lib-components `settings/options.ts`). Core stores any short text,
+// so the BFF is stricter: anything else is a 400.
+const DENSITIES = ['compact', 'normal', 'comfortable'] as const;
+const DATE_FORMATS = ['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'] as const;
+/** ISO 639 language code, optionally with an ISO 3166 region: `fr`, `en`, `fr-FR`. */
+const Language = z.string().regex(/^[a-z]{2,3}(-[A-Z]{2})?$/, 'Must be a language code such as `fr` or `fr-FR`');
 const APPEARANCE_FIELDS = ['theme', 'font_family', 'font_size', 'density'] as const;
 const GENERAL_FIELDS = ['language', 'timezone', 'date_format', 'home_page', 'auto_open_notifications'] as const;
 const NOTIFICATION_FIELDS = ['email', 'push', 'desktop', 'messages', 'projects', 'calendar'] as const;
@@ -75,7 +81,7 @@ export const AppearancePatchSchema = registry.register('SettingsAppearancePatch'
   theme: z.enum(THEMES).nullable().openapi({ example: 'dark' }),
   font_family: PreferenceText(128).nullable().openapi({ example: 'Marianne' }),
   font_size: FontSize.nullable().openapi({ example: 16 }),
-  density: PreferenceText(32).nullable().openapi({ example: 'compact' }),
+  density: z.enum(DENSITIES).nullable().openapi({ example: 'compact' }),
 }).partial().strict());
 export const GeneralSchema = registry.register('SettingsGeneral', z.object({
   language: z.string().nullable().openapi({ example: 'fr' }),
@@ -85,9 +91,9 @@ export const GeneralSchema = registry.register('SettingsGeneral', z.object({
   auto_open_notifications: z.boolean().nullable().openapi({ example: false }),
 }));
 export const GeneralPatchSchema = registry.register('SettingsGeneralPatch', z.object({
-  language: PreferenceText(16).nullable().openapi({ example: 'fr' }),
+  language: Language.nullable().openapi({ example: 'fr' }),
   timezone: PreferenceText(64).nullable().openapi({ example: 'Europe/Paris' }),
-  date_format: PreferenceText(32).nullable().openapi({ example: 'DD/MM/YYYY' }),
+  date_format: z.enum(DATE_FORMATS).nullable().openapi({ example: 'DD/MM/YYYY' }),
   home_page: PreferenceText(128).nullable().openapi({ example: '/dashboard' }),
   auto_open_notifications: z.boolean().nullable().openapi({ example: false }),
 }).partial().strict());
