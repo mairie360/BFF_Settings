@@ -18,8 +18,9 @@ export function meResponse(overrides: Partial<GetMeResponseView> = {}): GetMeRes
     email: 'anne.le-gall@mairie.test',
     first_name: 'Anne Marie',
     last_name: 'Le Gall',
-    phone: '+33123456789',
+    phone: '0123456789',
     role: 'User',
+    roles: ['User'],
     status: 'active',
     groups: [group(1, { name: 'Service urbanisme' })],
     ...overrides,
@@ -55,12 +56,12 @@ export const sessionsResult = (sessions: SessionSchema[]): GetSessionsResultView
 export const bearer = (token = 'session-anne') => `Bearer ${token}`;
 
 /**
- * Cibles Core des adaptateurs de préférences (src/routes/settings.ts). Aucune n'existe dans Core API 1.2.0 ni dans
- * son contrat publié : le BFF doit relayer le 404. upstream-contracts.test.ts vérifie qu'elles restent absentes ;
- * quand il échoue, Core les expose et les tests de préférences doivent mocker la vraie opération.
+ * Core targets of the preference adapters (src/routes/settings.ts). None of them existed in Core API 1.2.0: the BFF
+ * answers 404 without calling Core. upstream-contracts.test.ts checks that they stay absent; when it fails, Core
+ * exposes them and the BFF must relay them (and the preference tests mock the real operation).
  */
 export const PREFERENCE_TARGETS = [
-  { section: 'notifications', template: '/api/v1/user/me/notification-settings/' },
+  { section: 'notifications', template: '/api/v1/user/me/notifications/' },
   { section: 'appearance', template: '/api/v1/user/me/preferences/' },
   { section: 'general', template: '/api/v1/user/me/preferences/' },
 ] as const;

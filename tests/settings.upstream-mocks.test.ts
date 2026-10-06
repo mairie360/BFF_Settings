@@ -265,12 +265,14 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       ['200 without body, as Core API does', { status: 200 }],
       ['204', { status: 204 }],
     ] as const)('sends the patch to PATCH /api/v1/user/me/, accepts a %s and returns the re-read profile', async (_label, patchReply) => {
-      const patch = patchMe({ first_name: 'Anne Marie', last_name: 'Le Gall', email: 'anne.marie@mairie.test', phone: '+33987654321' });
+      const patch = patchMe({ first_name: 'Anne Marie', last_name: 'Le Gall', email: 'anne.marie@mairie.test', current_password: 'Anne-Password-1', phone: '0987654321' });
       // The re-read profile wins, even when it differs from what was sent (normalised by Core).
-      const persisted = meResponse({ first_name: 'Anne Marie', last_name: 'LE GALL', email: 'anne.marie@mairie.test', phone: '+33987654321' });
+      const persisted = meResponse({ first_name: 'Anne Marie', last_name: 'LE GALL', email: 'anne.marie@mairie.test', phone: '0987654321' });
+      // The e-mail is compared with the current one first (GET), then the profile is re-read after the PATCH.
+      let reads = 0;
       coreApi
         .on('patch', CORE.me, patchReply)
-        .on('get', CORE.me, { body: persisted });
+        .on('get', CORE.me, () => ({ body: reads++ === 0 ? meResponse() : persisted }));
 
       const response = await withSession(request(app).patch('/settings/profile').send(patch), 'session-42');
 
@@ -278,8 +280,10 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expectBffContract('patch', '/settings/profile', response);
       expect(response.headers['cache-control']).toBe('no-store');
       expect(response.body).toEqual(profileOf(persisted));
-      expect(upstreamSequence()).toEqual([called('PATCH', coreApiUrls.getPatchMeUrl()), called('GET', coreApiUrls.getGetMeUrl())]);
-      const [sent, reread] = coreApi.requests;
+      expect(upstreamSequence()).toEqual([
+        called('GET', coreApiUrls.getGetMeUrl()), called('PATCH', coreApiUrls.getPatchMeUrl()), called('GET', coreApiUrls.getGetMeUrl()),
+      ]);
+      const [, sent, reread] = coreApi.requests;
       expect(sent.body).toEqual(patch);
       expect(sent.headers['content-type']).toBe('application/json');
       expect(sent.headers.authorization).toBe(bearer('session-42'));
@@ -290,7 +294,6 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
     test.each([
       ['a single field', patchMe({ last_name: 'Le Gall-Martin' }), meResponse({ last_name: 'Le Gall-Martin' })],
       ['a phone removal', patchMe({ phone: null }), meResponse({ phone: null })],
-      ['an empty phone', patchMe({ phone: '' }), meResponse({ phone: '' })],
     ])('forwards only %s', async (_label, patch, persisted) => {
       coreApi.on('patch', CORE.me, { status: 200 }).on('get', CORE.me, { body: persisted });
 
@@ -299,6 +302,64 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(response.status).toBe(200);
       expectBffContract('patch', '/settings/profile', response);
       expect(coreApi.calls(CORE.me, 'patch')[0].body).toEqual(patch);
+    });
+
+    test('does not forward an unchanged e-mail and needs no current password for it', async () => {
+      const current = meResponse();
+      const persisted = meResponse({ first_name: 'Annie' });
+      let reads = 0;
+      coreApi
+        .on('patch', CORE.me, { status: 200 })
+        .on('get', CORE.me, () => ({ body: reads++ === 0 ? current : persisted }));
+      // The form sends the whole profile, with the current e-mail typed differently.
+      const form = { first_name: 'Annie', last_name: current.last_name, email: `  ${current.email.toUpperCase()} `, phone: current.phone };
+
+      const response = await withSession(request(app).patch('/settings/profile').send(form));
+
+      expect(response.status).toBe(200);
+      expectBffContract('patch', '/settings/profile', response);
+      expect(response.body).toEqual(profileOf(persisted));
+      expect(coreApi.calls(CORE.me, 'patch')[0].body).toEqual({ first_name: 'Annie', last_name: current.last_name, phone: current.phone });
+    });
+
+    test('answers the current profile without PATCH when only an unchanged e-mail is sent', async () => {
+      const current = meResponse();
+      coreApi.on('get', CORE.me, { body: current });
+
+      const response = await withSession(request(app).patch('/settings/profile').send({ email: current.email, current_password: 'Anne-Password-1' }));
+
+      expect(response.status).toBe(200);
+      expectBffContract('patch', '/settings/profile', response);
+      expect(response.body).toEqual(profileOf(current));
+      expect(upstreamSequence()).toEqual([called('GET', coreApiUrls.getGetMeUrl())]);
+    });
+
+    test('rejects a changed e-mail without the current password with 400 and does not call PATCH', async () => {
+      coreApi.on('get', CORE.me, { body: meResponse() });
+
+      const response = await withSession(request(app).patch('/settings/profile').send({ first_name: 'Anne', email: 'anne.new@mairie.test' }));
+
+      expect(response.status).toBe(400);
+      expectBffContract('patch', '/settings/profile', response);
+      expect(response.body).toEqual({ error: { code: 'BAD_REQUEST', message: 'Validation failed', details: [
+        { path: 'body.current_password', message: 'Required when email is changed' },
+      ] } });
+      expect(coreApi.calls(CORE.me, 'patch')).toHaveLength(0);
+    });
+
+    test('forwards a changed e-mail with the current password', async () => {
+      const persisted = meResponse({ email: 'anne.new@mairie.test' });
+      let reads = 0;
+      coreApi
+        .on('patch', CORE.me, { status: 200 })
+        .on('get', CORE.me, () => ({ body: reads++ === 0 ? meResponse() : persisted }));
+
+      const response = await withSession(request(app).patch('/settings/profile').send({ email: 'anne.new@mairie.test', current_password: 'Anne-Password-1' }));
+
+      expect(response.status).toBe(200);
+      expectBffContract('patch', '/settings/profile', response);
+      expect(response.body).toEqual(profileOf(persisted));
+      expect(coreApi.calls(CORE.me, 'patch')[0].body).toEqual({ email: 'anne.new@mairie.test', current_password: 'Anne-Password-1' });
     });
 
     test('drops the separators of a phone typed with spaces before Core API', async () => {
@@ -320,7 +381,14 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       ['a name longer than its column', { last_name: 'x'.repeat(65) }],
       ['markup in a name', { first_name: '<script>alert(1)</script>' }],
       ['a phone that is not a number', { phone: '../../etc/passwd' }],
-      ['a phone longer than its column', { phone: '+3312345678901234' }],
+      ['a phone longer than its column', { phone: '1234567890123456' }],
+      ['a phone shorter than 10 digits', { phone: '061234567' }],
+      // Core API >= 2.0 only stores digits: neither an international prefix nor an empty phone.
+      ['a phone with a + prefix', { phone: '+33987654321' }],
+      ['an empty phone', { phone: '' }],
+      // Core API >= 2.0 (MAIR-390) needs the current password to change the e-mail address.
+      ['an empty current password', { email: 'anne@mairie.test', current_password: '' }],
+      ['only the current password', { current_password: 'Anne-Password-1' }],
       ['a JSON array', [{ first_name: 'Anne' }]],
     ])('rejects %s with 400 without calling Core', async (_label, body) => {
       const response = await withSession(request(app).patch('/settings/profile').send(body));
@@ -376,7 +444,8 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       ['a Core 401', coreError(401, ''), 401, 'UNAUTHORIZED', 'Authentication required'],
       ['a Core 400', coreError(400, 'Json deserialize error'), 400, 'BAD_REQUEST', 'Invalid request'],
       ['an undeclared Core 404', coreError(404, 'Not Found'), 502, 'BAD_GATEWAY', 'Upstream service error'],
-      ['an undeclared Core 409', coreError(409, 'Conflict'), 502, 'BAD_GATEWAY', 'Upstream service error'],
+      ['a Core 403 (wrong current password)', coreError(403, 'The current password is incorrect.'), 403, 'FORBIDDEN', 'Access denied'],
+      ['a Core 409 (e-mail already used)', coreError(409, 'Conflict'), 409, 'CONFLICT', 'Conflict with the current state of the resource'],
       ['a Core 500', coreError(500), 502, 'BAD_GATEWAY', 'Upstream service error'],
     ])('does not report a save and does not re-read on %s', async (_label, reply, status, code, message) => {
       coreApi.on('patch', CORE.me, reply);

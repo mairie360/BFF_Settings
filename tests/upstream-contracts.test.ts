@@ -48,7 +48,7 @@ describe('Core API contract from the installed @mairie360/core-api-openapi packa
     const getMe = coreApi.match('GET', coreApiUrls.getGetMeUrl())!;
     expect(getMe.operation.parameters).toEqual([]);
     expect(coreApi.responseSchema(getMe, 200)).toEqual({ documented: true, schema: { $ref: '#/components/schemas/GetMeResponseView' } });
-    expect(coreApi.schema('GetMeResponseView')).toMatchObject({ required: ['email', 'first_name', 'groups', 'last_name', 'role', 'status'] });
+    expect(coreApi.schema('GetMeResponseView')).toMatchObject({ required: ['email', 'first_name', 'groups', 'last_name', 'role', 'roles', 'status'] });
 
     const patch = coreApi.match('PATCH', coreApiUrls.getPatchMeUrl())!;
     expect(coreApi.requestBodySchema(patch)).toEqual({ required: true, schema: { $ref: '#/components/schemas/PatchMeView' } });
@@ -104,7 +104,7 @@ describe('Core API fixtures conform to the Core API contract', () => {
   });
 
   test.each([
-    ['a full profile', patchMe({ first_name: 'Anne Marie', last_name: 'Le Gall', email: 'anne@mairie.test', phone: '+33123456789' })],
+    ['a full profile', patchMe({ first_name: 'Anne Marie', last_name: 'Le Gall', email: 'anne@mairie.test', current_password: 'Anne-Password-1', phone: '0123456789' })],
     ['a phone removal', patchMe({ phone: null })],
   ])('PATCH /api/v1/user/me/ body for %s', (_name, body) => {
     const patch = coreApi.match('PATCH', coreApiUrls.getPatchMeUrl())!;

@@ -185,7 +185,7 @@ export interface paths {
                         "application/json": components["schemas"]["SettingsProfile"];
                     };
                 };
-                /** @description Invalid or unsupported fields */
+                /** @description Invalid or unsupported fields, or a changed `email` without `current_password` */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -196,6 +196,24 @@ export interface paths {
                 };
                 /** @description Invalid session */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description `email` sent with a wrong `current_password`, or an account without password */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description `email` is already used by another account */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -535,6 +553,11 @@ export interface components {
             email?: string;
             /** @example 0612345678 */
             phone?: string | null;
+            /**
+             * @description Current password of the account, required when `email` changes the current address
+             * @example current-password
+             */
+            current_password?: string;
         };
         SettingsBootstrap: {
             profile: components["schemas"]["SettingsProfile"];

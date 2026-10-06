@@ -154,8 +154,15 @@
               "string",
               "null"
             ],
-            "pattern": "^(?:\\+?\\d(?:[\\s.-]?\\d){9,13})?$",
+            "pattern": "^\\d(?:[\\s.-]?\\d){9,14}$",
             "example": "0612345678"
+          },
+          "current_password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "Current password of the account, required when `email` changes the current address",
+            "example": "current-password"
           }
         },
         "additionalProperties": false
@@ -361,7 +368,7 @@
             }
           },
           "400": {
-            "description": "Invalid or unsupported fields",
+            "description": "Invalid or unsupported fields, or a changed `email` without `current_password`",
             "content": {
               "application/json": {
                 "schema": {
@@ -372,6 +379,26 @@
           },
           "401": {
             "description": "Invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`email` sent with a wrong `current_password`, or an account without password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`email` is already used by another account",
             "content": {
               "application/json": {
                 "schema": {

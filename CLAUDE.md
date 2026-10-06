@@ -159,7 +159,7 @@ non-401/403 answer. The spec requires `bearerAuth` at the top level (`openapi.ts
 - `cicd.yml` calls the shared `mairie360/CICD` `BFFs-cicd.yml@v2.3.0` (with `openapi_spec_path` and
   explicit `CODECOV_TOKEN` / `N8N_WEBHOOK_SECRET` secrets); Renovate keeps `cicd_version` aligned with
   the tag, and `.releaserc.json` drives semantic-release.
-- The test stacks pin `database` / `liquibase-migrations` 1.1.0, `core-api` 1.1.1 and `bff-user` 0.4.0.
+- The test stacks pin `database` / `liquibase-migrations` 2.0.0, `core-api` 2.0.0 and `bff-user` 0.5.0.
   Core API ≥ 1.1.1 panics on `/user/me` for users without a role, so `init-test.sql` gives user 2 the
   `User` role.
 - `tests/contracts.test.ts` mocks `globalThis.fetch` and requires `contracts/openapi.json` to exist.
