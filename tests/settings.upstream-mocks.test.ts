@@ -3,7 +3,7 @@ import request from 'supertest';
 import app from '../src/app';
 import { ContractMockServer, unreachableUrl, type MockReply } from './support/contract-mock-server';
 import {
-  PREFERENCE_SECTIONS, bearer, coreApiUrls, meResponse, notificationSettings, patchMe, preferences, profileOf, session, sessionsResult,
+  PREFERENCE_SECTIONS, SESSION_42, SESSION_ANNE, bearer, coreApiUrls, meResponse, notificationSettings, patchMe, preferences, profileOf, session, sessionsResult,
 } from './support/core-fixtures';
 import { OpenApiContract } from './support/openapi-contract';
 import { loadOrvalContract } from './support/orval-contract';
@@ -101,9 +101,9 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
     });
 
     test.each(BFF_ROUTES.flatMap((route) => [
-      { ...route, label: 'an accessToken cookie', header: ['Cookie', 'accessToken=session-anne'] as const },
-      { ...route, label: 'a session cookie', header: ['Cookie', 'session=session-anne'] as const },
-      { ...route, label: 'an x-session-token header', header: ['x-session-token', 'session-anne'] as const },
+      { ...route, label: 'an accessToken cookie', header: ['Cookie', `accessToken=${SESSION_ANNE}`] as const },
+      { ...route, label: 'a session cookie', header: ['Cookie', `session=${SESSION_ANNE}`] as const },
+      { ...route, label: 'an x-session-token header', header: ['x-session-token', SESSION_ANNE] as const },
     ]))('$method $path ignores $label and answers 401 without calling Core', async (route) => {
       const response = await call(route).set(route.header[0], route.header[1]);
 
@@ -118,10 +118,10 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
         .on('get', CORE.me, { body: meResponse() })
         .on('get', CORE.sessions, { body: sessionsResult([]) });
 
-      const response = await request(app).get('/settings/bootstrap').set('Authorization', 'bearer \tsession-42');
+      const response = await request(app).get('/settings/bootstrap').set('Authorization', `bearer \t${SESSION_42}`);
 
       expect(response.status).toBe(200);
-      expect(coreApi.requests.map((upstream) => upstream.headers.authorization)).toEqual(Array(4).fill(bearer('session-42')));
+      expect(coreApi.requests.map((upstream) => upstream.headers.authorization)).toEqual(Array(4).fill(bearer(SESSION_42)));
     });
 
     test.each(BFF_ROUTES)('$method $path answers 503 when Core API is not configured', async (route) => {
@@ -153,7 +153,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
         .on('get', CORE.me, { body: me })
         .on('get', CORE.sessions, { body: sessionsResult(sessions) });
 
-      const response = await withSession(request(app).get('/settings/bootstrap'), 'session-42');
+      const response = await withSession(request(app).get('/settings/bootstrap'), SESSION_42);
 
       expect(response.status).toBe(200);
       expectBffContract('get', '/settings/bootstrap', response);
@@ -168,7 +168,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
         called('GET', coreApiUrls.getGetMyPreferencesUrl()),
       ].sort());
       for (const upstream of coreApi.requests) {
-        expect(upstream.headers.authorization).toBe(bearer('session-42'));
+        expect(upstream.headers.authorization).toBe(bearer(SESSION_42));
         expect(upstream.headers.accept).toBe('application/json');
         expect(upstream.undeclaredQuery).toEqual([]);
         expect(upstream.body).toBeUndefined();
@@ -188,7 +188,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
     });
 
     test('keeps a null phone and accepts a profile without phone', async () => {
-      const me = meResponse({ phone: null, groups: [] });
+      const me = meResponse({ phone: null, phone_country: null, groups: [] });
       coreApi.on('get', CORE.me, { body: me }).on('get', CORE.sessions, { body: sessionsResult([]) });
 
       const nullPhone = await withSession(request(app).get('/settings/bootstrap'));
@@ -196,7 +196,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expectBffContract('get', '/settings/bootstrap', nullPhone);
       expect(nullPhone.body.profile).toEqual({ ...profileOf(me), phone: null });
 
-      coreApi.on('get', CORE.me, { body: without(me, 'phone') });
+      coreApi.on('get', CORE.me, { body: without(without(me, 'phone'), 'phone_country') });
       const missingPhone = await withSession(request(app).get('/settings/bootstrap'));
       expect(missingPhone.status).toBe(200);
       expectBffContract('get', '/settings/bootstrap', missingPhone);
@@ -277,10 +277,11 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(response.body.notifications).toEqual({ email: null, push: null, desktop: null, messages: null, projects: null, calendar: null });
     });
 
+    // A well-signed token Core refuses (revoked session): the BFF cannot know it, Core's 401 is kept.
     test('preserves a Core 401 on the profile without reading sessions', async () => {
       coreApi.on('get', CORE.me, coreError(401, ''));
 
-      const response = await withSession(request(app).get('/settings/bootstrap'), 'session-expiree');
+      const response = await withSession(request(app).get('/settings/bootstrap'), SESSION_42);
 
       expect(response.status).toBe(401);
       expectBffContract('get', '/settings/bootstrap', response);
@@ -353,7 +354,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
         .on('patch', CORE.me, patchReply)
         .on('get', CORE.me, () => ({ body: reads++ === 0 ? meResponse() : persisted }));
 
-      const response = await withSession(request(app).patch('/settings/profile').send(patch), 'session-42');
+      const response = await withSession(request(app).patch('/settings/profile').send(patch), SESSION_42);
 
       expect(response.status).toBe(200);
       expectBffContract('patch', '/settings/profile', response);
@@ -365,8 +366,8 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       const [, sent, reread] = coreApi.requests;
       expect(sent.body).toEqual(patch);
       expect(sent.headers['content-type']).toBe('application/json');
-      expect(sent.headers.authorization).toBe(bearer('session-42'));
-      expect(reread.headers.authorization).toBe(bearer('session-42'));
+      expect(sent.headers.authorization).toBe(bearer(SESSION_42));
+      expect(reread.headers.authorization).toBe(bearer(SESSION_42));
       expect(reread.body).toBeUndefined();
     });
 
@@ -441,14 +442,22 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(coreApi.calls(CORE.me, 'patch')[0].body).toEqual({ email: 'anne.new@mairie.test', current_password: 'Anne-Password-1' });
     });
 
-    test('drops the separators of a phone typed with spaces before Core API', async () => {
-      const persisted = meResponse({ phone: '0612345678' });
+    // Core API (MAIR-480) parses the number as typed against its country and answers it in E.164.
+    test.each([
+      ['a national number with its country', { phone: '06 12 34.56-78', phone_country: 'FR' }],
+      ['an E.164 number', { phone: '+33612345678' }],
+      ['a null phone, which clears it', { phone: null }],
+      ['an empty phone, which clears it', { phone: '' }],
+    ])('forwards %s to Core API as typed', async (_label, body) => {
+      const persisted = meResponse({ phone: '+33612345678', phone_country: 'FR' });
       coreApi.on('patch', CORE.me, { status: 200 }).on('get', CORE.me, { body: persisted });
 
-      const response = await withSession(request(app).patch('/settings/profile').send({ phone: '06 12 34.56-78' }));
+      const response = await withSession(request(app).patch('/settings/profile').send(body));
 
       expect(response.status).toBe(200);
-      expect(coreApi.calls(CORE.me, 'patch')[0].body).toEqual({ phone: '0612345678' });
+      expectBffContract('patch', '/settings/profile', response);
+      expect(coreApi.calls(CORE.me, 'patch')[0].body).toEqual(body);
+      expect(response.body).toMatchObject({ phone: '+33612345678', phone_country: 'FR' });
     });
 
     test.each([
@@ -460,11 +469,10 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       ['a name longer than its column', { last_name: 'x'.repeat(65) }],
       ['markup in a name', { first_name: '<script>alert(1)</script>' }],
       ['a phone that is not a number', { phone: '../../etc/passwd' }],
-      ['a phone longer than its column', { phone: '1234567890123456' }],
-      ['a phone shorter than 10 digits', { phone: '061234567' }],
-      // Core API >= 2.0 only stores digits: neither an international prefix nor an empty phone.
-      ['a phone with a + prefix', { phone: '+33987654321' }],
-      ['an empty phone', { phone: '' }],
+      ['a phone longer than Core accepts', { phone: '0'.repeat(33) }],
+      ['a + inside the phone', { phone: '06+12345678' }],
+      ['a lower-case country', { phone: '0612345678', phone_country: 'fr' }],
+      ['a country that is not a code', { phone: '0612345678', phone_country: 'FRA' }],
       // Core API >= 2.0 (MAIR-390) needs the current password to change the e-mail address.
       ['an empty current password', { email: 'anne@mairie.test', current_password: '' }],
       ['only the current password', { current_password: 'Anne-Password-1' }],
@@ -495,7 +503,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(response.status).toBe(400);
       expectBffContract('patch', '/settings/profile', response);
       expect(response.body).toEqual({ error: { code: 'BAD_REQUEST', message: 'Validation failed', details: [
-        { path: 'body', message: 'Expected at least one of first_name, last_name, email, phone' },
+        { path: 'body', message: 'Expected at least one of first_name, last_name, email, phone, phone_country' },
       ] } });
       expect(coreApi.requests).toHaveLength(0);
     });
@@ -560,7 +568,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       const stored: Record<string, unknown> = { ...(template === CORE.preferences ? preferences() : notificationSettings()), ...patch };
       coreApi.on('patch', template, { body: stored });
 
-      const response = await withSession(request(app).patch(`/settings/${section}`).send(patch), 'session-42');
+      const response = await withSession(request(app).patch(`/settings/${section}`).send(patch), SESSION_42);
 
       expect(response.status).toBe(200);
       expectBffContract('patch', `/settings/${section}`, response);
@@ -569,7 +577,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(upstreamSequence()).toEqual([called('PATCH', template)]);
       const [sent] = coreApi.requests;
       expect(sent.body).toEqual(patch);
-      expect(sent.headers.authorization).toBe(bearer('session-42'));
+      expect(sent.headers.authorization).toBe(bearer(SESSION_42));
     });
 
     test.each([
