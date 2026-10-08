@@ -3,7 +3,8 @@
 --   * sub = "1": Admin role. docker-compose-security.yml injects a static token for it
 --     through the ZAP replacer, so every operation is scanned authenticated;
 --   * sub = "2": User role only. load-test.js signs a token for it on the fly.
--- BFF Settings only reads the Core profile (/api/v1/user/me/) and the session list.
+-- BFF Settings reads the Core profile (/api/v1/user/me/), the session list, the preferences and the
+-- notification settings (a user who never saved them gets the application defaults).
 
 -- Passwords must be argon2id hashes (chk_users_password_hashed, MAIR-169): this is the
 -- Database template hash, nobody signs in with it (the tests use forged JWTs).

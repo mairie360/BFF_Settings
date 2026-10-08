@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { BootstrapSchema, ProfilePatchSchema, ProfileSchema } from '../src/routes/settings';
-import { PREFERENCE_TARGETS, coreApiUrls, group, meResponse, patchMe, session, sessionsResult } from './support/core-fixtures';
+import {
+  AppearancePatchSchema, BootstrapSchema, GeneralPatchSchema, NotificationsPatchSchema, ProfilePatchSchema, ProfileSchema,
+} from '../src/routes/settings';
+import { coreApiUrls, group, meResponse, notificationSettings, patchMe, preferences, session, sessionsResult } from './support/core-fixtures';
 import type { JsonSchema } from './support/openapi-contract';
 import { loadOrvalContract, resolveOrvalPackage } from './support/orval-contract';
 
@@ -16,6 +18,10 @@ const CONSUMED = [
   { operationId: 'getMe', method: 'get', url: coreApiUrls.getGetMeUrl() },
   { operationId: 'patchMe', method: 'patch', url: coreApiUrls.getPatchMeUrl() },
   { operationId: 'getActiveSessions', method: 'get', url: coreApiUrls.getGetActiveSessionsUrl() },
+  { operationId: 'getMyPreferences', method: 'get', url: coreApiUrls.getGetMyPreferencesUrl() },
+  { operationId: 'patchMyPreferences', method: 'patch', url: coreApiUrls.getPatchMyPreferencesUrl() },
+  { operationId: 'getMyNotificationSettings', method: 'get', url: coreApiUrls.getGetMyNotificationSettingsUrl() },
+  { operationId: 'patchMyNotificationSettings', method: 'patch', url: coreApiUrls.getPatchMyNotificationSettingsUrl() },
   { operationId: 'health', method: 'get', url: coreApiUrls.getHealthUrl() },
 ] as const;
 
@@ -48,7 +54,7 @@ describe('Core API contract from the installed @mairie360/core-api-openapi packa
     const getMe = coreApi.match('GET', coreApiUrls.getGetMeUrl())!;
     expect(getMe.operation.parameters).toEqual([]);
     expect(coreApi.responseSchema(getMe, 200)).toEqual({ documented: true, schema: { $ref: '#/components/schemas/GetMeResponseView' } });
-    expect(coreApi.schema('GetMeResponseView')).toMatchObject({ required: ['email', 'first_name', 'groups', 'last_name', 'role', 'status'] });
+    expect(coreApi.schema('GetMeResponseView')).toMatchObject({ required: ['email', 'first_name', 'groups', 'last_name', 'role', 'roles', 'status'] });
 
     const patch = coreApi.match('PATCH', coreApiUrls.getPatchMeUrl())!;
     expect(coreApi.requestBodySchema(patch)).toEqual({ required: true, schema: { $ref: '#/components/schemas/PatchMeView' } });
@@ -79,11 +85,36 @@ describe('BFF Settings schemas stay compatible with the Core API contract', () =
   });
 });
 
-describe('known gaps between the Core API contract and what the BFF calls', () => {
-  // When this test fails, Core API exposes the preferences: the BFF must relay them instead of answering 404.
+describe('preference operations consumed by the BFF', () => {
+  test.each([
+    ['preferences', coreApiUrls.getGetMyPreferencesUrl(), 'PatchPreferencesView', 'UserPreferences'],
+    ['notification settings', coreApiUrls.getGetMyNotificationSettingsUrl(), 'PatchNotificationSettingsView', 'UserNotificationSettings'],
+  ])('GET and PATCH of the %s keep their models', (_name, url, patchView, model) => {
+    const read = coreApi.match('GET', url)!;
+    expect(read.operation.parameters).toEqual([]);
+    expect(coreApi.responseSchema(read, 200)).toEqual({ documented: true, schema: { $ref: `#/components/schemas/${model}` } });
+    const write = coreApi.match('PATCH', url)!;
+    expect(coreApi.requestBodySchema(write)).toEqual({ required: true, schema: { $ref: `#/components/schemas/${patchView}` } });
+    expect(coreApi.responseSchema(write, 200)).toEqual({ documented: true, schema: { $ref: `#/components/schemas/${model}` } });
+  });
 
-  test.each(PREFERENCE_TARGETS)('PATCH $template (/settings/$section) is not exposed by Core API', ({ template }) => {
-    expect(coreApi.document.paths[template]).toBeUndefined();
+  test('appearance and general split exactly the Core preferences, editable and stored', () => {
+    const sections = [...Object.keys(AppearancePatchSchema.shape), ...Object.keys(GeneralPatchSchema.shape)].sort();
+    expect(sections).toEqual(properties('PatchPreferencesView'));
+    expect(sections).toEqual(properties('UserPreferences'));
+  });
+
+  test('notifications are exactly the Core notification settings, editable and stored', () => {
+    expect(Object.keys(NotificationsPatchSchema.shape).sort()).toEqual(properties('PatchNotificationSettingsView'));
+    expect(Object.keys(NotificationsPatchSchema.shape).sort()).toEqual(properties('UserNotificationSettings'));
+  });
+
+  test.each([
+    ['appearance', AppearancePatchSchema, { theme: 'system', font_family: 'Marianne', font_size: 18, density: null }, 'PatchPreferencesView'],
+    ['general', GeneralPatchSchema, { language: 'fr', timezone: 'Europe/Paris', date_format: null, home_page: '/dashboard', auto_open_notifications: true }, 'PatchPreferencesView'],
+    ['notifications', NotificationsPatchSchema, { email: false, push: null, calendar: true }, 'PatchNotificationSettingsView'],
+  ] as const)('a %s patch accepted by the BFF is a valid Core body', (_name, schema, body, patchView) => {
+    expect(coreApi.validate(coreApi.schema(patchView), schema.parse(body))).toEqual([]);
   });
 });
 
@@ -104,7 +135,21 @@ describe('Core API fixtures conform to the Core API contract', () => {
   });
 
   test.each([
-    ['a full profile', patchMe({ first_name: 'Anne Marie', last_name: 'Le Gall', email: 'anne@mairie.test', phone: '+33123456789' })],
+    ['stored preferences', preferences()],
+    ['default preferences', preferences({ theme: null, font_size: null, auto_open_notifications: null })],
+  ])('UserPreferences for %s', (_name, body) => {
+    expect(coreApi.validate(responseSchema('get', coreApiUrls.getGetMyPreferencesUrl()), body)).toEqual([]);
+  });
+
+  test.each([
+    ['stored settings', notificationSettings()],
+    ['default settings', notificationSettings({ email: null, push: null })],
+  ])('UserNotificationSettings for %s', (_name, body) => {
+    expect(coreApi.validate(responseSchema('get', coreApiUrls.getGetMyNotificationSettingsUrl()), body)).toEqual([]);
+  });
+
+  test.each([
+    ['a full profile', patchMe({ first_name: 'Anne Marie', last_name: 'Le Gall', email: 'anne@mairie.test', current_password: 'Anne-Password-1', phone: '0123456789' })],
     ['a phone removal', patchMe({ phone: null })],
   ])('PATCH /api/v1/user/me/ body for %s', (_name, body) => {
     const patch = coreApi.match('PATCH', coreApiUrls.getPatchMeUrl())!;

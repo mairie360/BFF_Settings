@@ -25,7 +25,8 @@ const JWT_SECRET = __ENV.JWT_SECRET || 'b"secret"';
 // User role only, seeded by init-test.sql (sub of the token).
 const USER_ID = __ENV.PERF_USER_ID || '2';
 // Profile of user 2 as seeded by init-test.sql: PATCH /settings/profile writes a phone number, then
-// restores these values so the reads keep seeing the seed.
+// restores these values so the reads keep seeing the seed (Core API >= 2.0 ignores a null phone and
+// cannot clear it, so the written phone stays).
 const SEEDED_PROFILE = { first_name: 'Perf', last_name: 'Tester', phone: null };
 
 function b64url(value) {
@@ -42,14 +43,9 @@ function mintJwt(sub, role) {
   return `${signingInput}.${signature}`;
 }
 
-// Core API (core-api 1.2.0, latest release) has no preferences operation: the BFF answers the
-// documented 404 on these sections until Core publishes them. Only that 404 is accepted.
-const preferenceStatuses = { responseCallback: http.expectedStatuses(200, 404) };
+// The preference sections are relayed to Core API (preferences / notification settings of user 2).
 function preferenceHandler(section, body) {
-  return ({ request }) =>
-    check(request({ body, params: preferenceStatuses }), {
-      [`${section} 200 (404: not in Core yet)`]: (r) => r.status === 200 || r.status === 404,
-    });
+  return ({ request }) => check(request({ body }), { [`${section} 200`]: (r) => r.status === 200 });
 }
 
 const handlers = {

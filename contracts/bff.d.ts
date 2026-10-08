@@ -104,7 +104,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Core profile and sessions of the signed-in user */
+                /** @description Core profile, sessions, preferences and notification settings of the signed-in user */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -185,6 +185,174 @@ export interface paths {
                         "application/json": components["schemas"]["SettingsProfile"];
                     };
                 };
+                /** @description Invalid or unsupported fields, or a changed `email` without `current_password` */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Invalid session */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description `email` sent with a wrong `current_password`, or an account without password */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description `email` is already used by another account */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core is unavailable, failed or answered an unexpected status */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core is not configured */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/settings/appearance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SettingsAppearancePatch"];
+                };
+            };
+            responses: {
+                /** @description appearance settings saved by Core */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SettingsAppearance"];
+                    };
+                };
+                /** @description Invalid or unsupported fields */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Invalid session */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core is unavailable, failed or answered an unexpected status */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core is not configured */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/settings/general": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SettingsGeneralPatch"];
+                };
+            };
+            responses: {
+                /** @description general settings saved by Core */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SettingsGeneral"];
+                    };
+                };
                 /** @description Invalid or unsupported fields */
                 400: {
                     headers: {
@@ -247,24 +415,20 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SettingsNotificationsPatch"];
                 };
             };
             responses: {
-                /** @description Preferences saved by Core */
+                /** @description notifications settings saved by Core */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
+                        "application/json": components["schemas"]["SettingsNotifications"];
                     };
                 };
-                /** @description Unparsable request body */
+                /** @description Invalid or unsupported fields */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -275,191 +439,6 @@ export interface paths {
                 };
                 /** @description Invalid session */
                 401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ErrorResponse"];
-                    };
-                };
-                /** @description Not available in Core yet */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ErrorResponse"];
-                    };
-                };
-                /** @description Core is unavailable, failed or answered an unexpected status */
-                502: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ErrorResponse"];
-                    };
-                };
-                /** @description Core is not configured */
-                503: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ErrorResponse"];
-                    };
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/settings/appearance": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            responses: {
-                /** @description Preferences saved by Core */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-                /** @description Unparsable request body */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ErrorResponse"];
-                    };
-                };
-                /** @description Invalid session */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ErrorResponse"];
-                    };
-                };
-                /** @description Not available in Core yet */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ErrorResponse"];
-                    };
-                };
-                /** @description Core is unavailable, failed or answered an unexpected status */
-                502: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ErrorResponse"];
-                    };
-                };
-                /** @description Core is not configured */
-                503: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ErrorResponse"];
-                    };
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/settings/general": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            responses: {
-                /** @description Preferences saved by Core */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-                /** @description Unparsable request body */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ErrorResponse"];
-                    };
-                };
-                /** @description Invalid session */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ErrorResponse"];
-                    };
-                };
-                /** @description Not available in Core yet */
-                404: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -535,6 +514,95 @@ export interface components {
             email?: string;
             /** @example 0612345678 */
             phone?: string | null;
+            /**
+             * @description Current password of the account, required when `email` changes the current address
+             * @example current-password
+             */
+            current_password?: string;
+        };
+        SettingsAppearance: {
+            /**
+             * @example dark
+             * @enum {string|null}
+             */
+            theme: "light" | "dark" | "system" | null;
+            /** @example Marianne */
+            font_family: string | null;
+            /** @example 16 */
+            font_size: number | null;
+            /** @example compact */
+            density: string | null;
+        };
+        SettingsAppearancePatch: {
+            /**
+             * @example dark
+             * @enum {string|null}
+             */
+            theme?: "light" | "dark" | "system" | null;
+            /** @example Marianne */
+            font_family?: string | null;
+            /** @example 16 */
+            font_size?: number | null;
+            /**
+             * @example compact
+             * @enum {string|null}
+             */
+            density?: "compact" | "normal" | "comfortable" | null;
+        };
+        SettingsGeneral: {
+            /** @example fr */
+            language: string | null;
+            /** @example Europe/Paris */
+            timezone: string | null;
+            /** @example DD/MM/YYYY */
+            date_format: string | null;
+            /** @example /dashboard */
+            home_page: string | null;
+            /** @example false */
+            auto_open_notifications: boolean | null;
+        };
+        SettingsGeneralPatch: {
+            /** @example fr */
+            language?: string | null;
+            /** @example Europe/Paris */
+            timezone?: string | null;
+            /**
+             * @example DD/MM/YYYY
+             * @enum {string|null}
+             */
+            date_format?: "DD/MM/YYYY" | "MM/DD/YYYY" | "YYYY-MM-DD" | null;
+            /** @example /dashboard */
+            home_page?: string | null;
+            /** @example false */
+            auto_open_notifications?: boolean | null;
+        };
+        SettingsNotifications: {
+            /** @example true */
+            email: boolean | null;
+            /** @example false */
+            push: boolean | null;
+            /** @example true */
+            desktop: boolean | null;
+            /** @example true */
+            messages: boolean | null;
+            /** @example true */
+            projects: boolean | null;
+            /** @example false */
+            calendar: boolean | null;
+        };
+        SettingsNotificationsPatch: {
+            /** @example true */
+            email?: boolean | null;
+            /** @example false */
+            push?: boolean | null;
+            /** @example true */
+            desktop?: boolean | null;
+            /** @example true */
+            messages?: boolean | null;
+            /** @example true */
+            projects?: boolean | null;
+            /** @example false */
+            calendar?: boolean | null;
         };
         SettingsBootstrap: {
             profile: components["schemas"]["SettingsProfile"];
@@ -546,9 +614,16 @@ export interface components {
                 expires_at: string;
                 revoked_at?: string | null;
             }[];
+            appearance: components["schemas"]["SettingsAppearance"] | null;
+            general: components["schemas"]["SettingsGeneral"] | null;
+            notifications: components["schemas"]["SettingsNotifications"] | null;
             sources: {
                 /** @enum {string} */
                 sessions: "available" | "unavailable";
+                /** @enum {string} */
+                preferences: "available" | "unavailable";
+                /** @enum {string} */
+                notifications: "available" | "unavailable";
             };
         };
     };
