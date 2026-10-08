@@ -1,0 +1,73 @@
+# GDPR log marker journey (MAIR-290), played by mairie360/CICD tests/gdpr/marker.
+#
+# The settings profile carries the agent's names, e-mail and phone, and an e-mail change takes the
+# current password. The marker's values go there, into preferences and into deliberate errors;
+# the logs of every container of docker-compose-gdpr-marker.yml (the BFF, Core API, BFF User,
+# Postgres, Redis) are then searched for them (see gdpr_marker_test.sh). A log describes an error
+# by its type and context, never by the value it received.
+version: 1
+target: http://bff-settings:4008
+wait: /health
+# The admin JWT of the stack (sub=1, the seeded Admin), the same one the ZAP scan uses.
+env: [ADMIN_JWT]
+steps:
+  - name: read the settings
+    request: {method: GET, path: /settings/bootstrap, headers: {Authorization: "Bearer {{env.ADMIN_JWT}}"}}
+  - name: save the marker's names and phone in the profile
+    request:
+      method: PATCH
+      path: /settings/profile
+      headers: {Authorization: "Bearer {{env.ADMIN_JWT}}"}
+      json: {first_name: "{{marker.first_name}}", last_name: "{{marker.last_name}}", phone: "{{marker.phone}}"}
+  - name: change the e-mail with a wrong current password (deliberate error)
+    request:
+      method: PATCH
+      path: /settings/profile
+      headers: {Authorization: "Bearer {{env.ADMIN_JWT}}"}
+      json: {email: "{{marker.email}}", current_password: "{{marker.password}}"}
+    expect: [403]
+  - name: change the e-mail without the current password (deliberate error)
+    request:
+      method: PATCH
+      path: /settings/profile
+      headers: {Authorization: "Bearer {{env.ADMIN_JWT}}"}
+      json: {email: "{{marker.email}}"}
+    expect: [400]
+  - name: save a refused e-mail (deliberate error)
+    request:
+      method: PATCH
+      path: /settings/profile
+      headers: {Authorization: "Bearer {{env.ADMIN_JWT}}"}
+      json: {email: "{{marker.last_name}}", current_password: "{{marker.password}}"}
+    expect: [400]
+  - name: save a refused phone and name (deliberate error)
+    request:
+      method: PATCH
+      path: /settings/profile
+      headers: {Authorization: "Bearer {{env.ADMIN_JWT}}"}
+      json: {first_name: "<{{marker.first_name}}>", phone: "+{{marker.phone}}"}
+    expect: [400]
+  - name: save an unknown profile field (deliberate error)
+    request:
+      method: PATCH
+      path: /settings/profile
+      headers: {Authorization: "Bearer {{env.ADMIN_JWT}}"}
+      json: {address: "1 rue {{marker.last_name}}", phone: "{{marker.phone}}"}
+    expect: [400]
+  - name: save a general preference of the wrong type (deliberate error)
+    request:
+      method: PATCH
+      path: /settings/general
+      headers: {Authorization: "Bearer {{env.ADMIN_JWT}}"}
+      json: {home_page: "/{{marker.email}}", auto_open_notifications: "{{marker.phone}}"}
+    expect: [400]
+  - name: save a refused theme (deliberate error)
+    request:
+      method: PATCH
+      path: /settings/appearance
+      headers: {Authorization: "Bearer {{env.ADMIN_JWT}}"}
+      json: {theme: "{{marker.last_name}}"}
+    expect: [400]
+  - name: read the settings with an invalid token (deliberate error)
+    request: {method: GET, path: "/settings/bootstrap?email={{marker.email}}", headers: {Authorization: "Bearer {{marker.password}}"}}
+    expect: [401]
