@@ -1,4 +1,4 @@
-import { asCaller, callUpstream, parseRequest, requireBearer, validationError } from '@mairie360/bffs-lib';
+import { asCaller, callUpstream, parseRequest, requireSession, validationError } from '@mairie360/bffs-lib';
 import { Router, type Request } from 'express';
 import { z } from 'zod';
 import { registry, ErrorSchema } from '../openapi-registry';
@@ -9,20 +9,23 @@ const errorContent = { content: { 'application/json': { schema: ErrorSchema } } 
 // Common error answers: session refused (BFF or Core), Core failure (network, 5xx, undeclared 4xx or
 // invalid answer), Core not configured.
 const upstreamErrors = {
-  401: { description: 'Invalid session', ...errorContent },
+  401: { description: 'Missing, forged or expired session token, or a session Core refuses', ...errorContent },
   502: { description: 'Core is unavailable, failed or answered an unexpected status', ...errorContent },
-  503: { description: 'Core is not configured', ...errorContent },
+  503: { description: 'Core or JWT_SECRET is not configured', ...errorContent },
 };
 
 const router = Router();
-// Every /settings route needs the caller's session: 401 before any Core call without a Bearer token.
-router.use(requireBearer);
+// Every /settings route needs the caller's session: 401 before any Core call without a Bearer token verified
+// with JWT_SECRET (HS256, expiry; bffs-lib requireSession, MAIR-474). Core still checks revocation.
+router.use(requireSession);
 // The examples are valid values, so a generated request (Swagger UI, ZAP) is accepted.
 export const ProfileSchema = registry.register('SettingsProfile', z.object({
   first_name: z.string().openapi({ example: 'Security' }),
   last_name: z.string().openapi({ example: 'Admin' }),
   email: z.string().email().openapi({ example: 'security-admin@mairie360.fr' }),
-  phone: z.string().nullable().optional().openapi({ example: '0612345678' }),
+  // Core API (MAIR-480) answers the phone in E.164 next to its country.
+  phone: z.string().nullable().optional().openapi({ example: '+33612345678' }),
+  phone_country: z.string().nullable().optional().openapi({ description: 'ISO 3166-1 alpha-2 country of the phone', example: 'FR' }),
 }));
 // Edits follow the database columns (names up to 64 characters, phone up to 15): a longer value made
 // Core API 1.2.0 fail with a 500 (Core 2.0 enforces the same limits with a 400). Names are rendered by the fronts, so `<`
@@ -32,12 +35,16 @@ export const ProfilePatchSchema = registry.register('SettingsProfilePatch', z.ob
   first_name: PersonName.openapi({ example: 'Security' }),
   last_name: PersonName.openapi({ example: 'Admin' }),
   email: z.string().trim().email().max(320).openapi({ example: 'security-admin@mairie360.fr' }),
-  // Separators typed in the form (spaces, dots, dashes) are accepted and dropped before Core API.
-  // Core API >= 2.0 only stores 10 to 15 digits: no `+` prefix, and an empty value cannot clear the phone.
+  // Core API (MAIR-480) parses the number as typed against the numbering plan of `phone_country`, or of
+  // its own `+` prefix in E.164 (400 otherwise); `null` or `""` clears it. Same characters and length as Core.
   phone: z.string()
-    .regex(/^\d(?:[\s.-]?\d){9,14}$/, 'Expected 10 to 15 digits')
+    .max(32)
+    .regex(/^(?:\+?[\d\s.()-]+)?$/, 'Expected a phone number: digits, spaces, `.`, `-`, `(`, `)` and a leading `+`')
     .nullable()
-    .openapi({ example: '0612345678' }),
+    .openapi({ example: '06 12 34 56 78' }),
+  // Country of a national number (ISO 3166-1 alpha-2); only accepted with `phone`.
+  phone_country: z.string().regex(/^[A-Z]{2}$/, 'Expected an ISO 3166-1 alpha-2 code').nullable()
+    .openapi({ example: 'FR' }),
   // Core API >= 2.0 (MAIR-390) only changes the e-mail address with the current password of the account
   // (403 when it is wrong). Only needed, and only forwarded to Core, when `email` differs from the
   // current one; never stored nor returned.
@@ -46,7 +53,7 @@ export const ProfilePatchSchema = registry.register('SettingsProfilePatch', z.ob
     example: 'current-password',
   }),
 }).partial().strict());
-const PROFILE_FIELDS = ['first_name', 'last_name', 'email', 'phone'] as const;
+const PROFILE_FIELDS = ['first_name', 'last_name', 'email', 'phone', 'phone_country'] as const;
 const SessionSchema = z.object({
   id: z.string(), device_info: z.string(), ip_address: z.string(), created_at: z.string(), expires_at: z.string(), revoked_at: z.string().nullable().optional(),
 });
@@ -184,7 +191,7 @@ router.patch('/profile', async (req, res) => {
   const body = parseRequest(ProfilePatchSchema, req.body, 'body');
   // An empty patch is refused instead of answering a save that changed nothing.
   if (!PROFILE_FIELDS.some((field) => field in body)) {
-    throw validationError('body', [{ path: [], message: 'Expected at least one of first_name, last_name, email, phone' }]);
+    throw validationError('body', [{ path: [], message: 'Expected at least one of first_name, last_name, email, phone, phone_country' }]);
   }
   // The settings form always sends the whole profile: an e-mail equal to the current one (trimmed,
   // case-insensitive) is not a change and is not sent to Core, so it needs no current password.
@@ -202,7 +209,6 @@ router.patch('/profile', async (req, res) => {
       return res.json(current);
     }
   }
-  if (typeof patch.phone === 'string') patch = { ...patch, phone: patch.phone.replace(/[\s.-]/g, '') };
   // Not retried: only idempotent reads are.
   await callUpstream('CORE_API', () => coreApi.patchMe(patch, asCaller('CORE_API', req)), { declared: [400, 401, 403, 409] });
   return res.json(await readProfile(req));

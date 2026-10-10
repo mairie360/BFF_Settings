@@ -113,7 +113,7 @@ export interface paths {
                         "application/json": components["schemas"]["SettingsBootstrap"];
                     };
                 };
-                /** @description Invalid session */
+                /** @description Missing, forged or expired session token, or a session Core refuses */
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -131,7 +131,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core is not configured */
+                /** @description Core or JWT_SECRET is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -194,7 +194,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Invalid session */
+                /** @description Missing, forged or expired session token, or a session Core refuses */
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -230,7 +230,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core is not configured */
+                /** @description Core or JWT_SECRET is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -287,7 +287,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Invalid session */
+                /** @description Missing, forged or expired session token, or a session Core refuses */
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -305,7 +305,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core is not configured */
+                /** @description Core or JWT_SECRET is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -362,7 +362,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Invalid session */
+                /** @description Missing, forged or expired session token, or a session Core refuses */
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -380,7 +380,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core is not configured */
+                /** @description Core or JWT_SECRET is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -437,7 +437,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Invalid session */
+                /** @description Missing, forged or expired session token, or a session Core refuses */
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -455,7 +455,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core is not configured */
+                /** @description Core or JWT_SECRET is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -499,8 +499,13 @@ export interface components {
              * @example security-admin@mairie360.fr
              */
             email: string;
-            /** @example 0612345678 */
+            /** @example +33612345678 */
             phone?: string | null;
+            /**
+             * @description ISO 3166-1 alpha-2 country of the phone
+             * @example FR
+             */
+            phone_country?: string | null;
         };
         SettingsProfilePatch: {
             /** @example Security */
@@ -512,8 +517,10 @@ export interface components {
              * @example security-admin@mairie360.fr
              */
             email?: string;
-            /** @example 0612345678 */
+            /** @example 06 12 34 56 78 */
             phone?: string | null;
+            /** @example FR */
+            phone_country?: string | null;
             /**
              * @description Current password of the account, required when `email` changes the current address
              * @example current-password

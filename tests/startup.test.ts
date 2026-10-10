@@ -27,6 +27,18 @@ describe('startup configuration check', () => {
     expect(() => start(0)).toThrow('CORE_API_URL');
   });
 
+  test('refuses to start without JWT_SECRET, which verifies the session tokens', () => {
+    process.env.CORE_API_URL = 'http://core:3000';
+    const secret = process.env.JWT_SECRET;
+    process.env.JWT_SECRET = '';
+
+    try {
+      expect(() => start(0)).toThrow('Missing configuration: JWT_SECRET');
+    } finally {
+      process.env.JWT_SECRET = secret;
+    }
+  });
+
   test('listens once every upstream is configured', async () => {
     process.env.CORE_API_URL = 'http://core:3000';
     jest.spyOn(console, 'log').mockImplementation(() => undefined);

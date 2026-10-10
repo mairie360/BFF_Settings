@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "9.1.0",
-    "@mairie360/bffs-lib": "1.1.0",
+    "@mairie360/bffs-lib": "1.2.0",
     "axios": "1.20.0",
     "dotenv": "17.4.2",
     "express": "5.2.1",
@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@mairie360/core-api-openapi": "2.0.0",
+    "@mairie360/core-api-openapi": "0.0.0-dev-abaa6c2",
     "@types/express": "5.0.6",
     "@types/jest": "30.0.0",
     "@types/node": "^24.0.0",

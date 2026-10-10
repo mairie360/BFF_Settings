@@ -1,6 +1,7 @@
 import request from 'supertest';
 import type { Express } from 'express';
 import app from '../src/app';
+import { bearer } from './support/core-fixtures';
 import { ProfilePatchSchema } from '../src/routes/settings';
 
 describe('application-wide security middleware', () => {
@@ -51,7 +52,7 @@ describe('final handlers', () => {
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     const parseSpy = jest.spyOn(ProfilePatchSchema, 'safeParse').mockImplementation(() => { throw new Error('secret internal detail'); });
 
-    const response = await request(app).patch('/settings/profile').set('Authorization', 'Bearer test-session').send({ first_name: 'Anne' });
+    const response = await request(app).patch('/settings/profile').set('Authorization', bearer()).send({ first_name: 'Anne' });
 
     expect(response.status).toBe(500);
     expect(response.body).toEqual({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error', details: [] } });
