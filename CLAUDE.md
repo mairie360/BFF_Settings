@@ -120,8 +120,6 @@ version, the consumed operations, BFF↔Core schema compatibility and the known 
 - Fixtures live in `tests/support/core-fixtures.ts` and are validated against the contract.
 - `openapi-contract.ts`, `contract-mock-server.ts` and `orval-contract.ts` are shared verbatim with `BFF_user`,
   `BFF_Calendar`, `BFF_Dashboard`, `BFF_Elearning` and `BFF_Message`; keep the copies identical.
-- `.npmrc` sets `min-release-age=7`: npm 11 refuses a freshly published `@mairie360/*` version unless run with
-  `--min-release-age=0`.
 
 ## Isolated test stacks (perf / security)
 
