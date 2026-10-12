@@ -182,7 +182,7 @@ non-401/403 answer. The spec requires `bearerAuth` at the top level (`openapi.ts
   explicit `CODECOV_TOKEN` / `N8N_WEBHOOK_SECRET` secrets); Renovate keeps `cicd_version` aligned with
   the tag, and `.releaserc.json` drives semantic-release.
 - The test stacks pin the dev releases `database` / `liquibase-migrations` `dev-99f6127` and `core-api`
-  `dev-abaa6c2` (the contract `@mairie360/core-api-openapi` `0.0.0-dev-abaa6c2`). Core API ≥ 1.1.1 panics on `/user/me` for users without a role, so `init-test.sql` gives user 2 the
+  `dev-2529974` (the contract `@mairie360/core-api-openapi` `0.0.0-dev-2529974`). Core API ≥ 1.1.1 panics on `/user/me` for users without a role, so `init-test.sql` gives user 2 the
   `User` role.
 - `tests/contracts.test.ts` mocks `globalThis.fetch` and requires `contracts/openapi.json` to exist.
 
