@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@mairie360/core-api-openapi": "0.0.0-dev-2529974",
+    "@mairie360/core-api-openapi": "0.0.0-dev-95531e2",
     "@types/express": "5.0.6",
     "@types/jest": "30.0.0",
     "@types/node": "^24.0.0",
