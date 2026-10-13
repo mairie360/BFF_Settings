@@ -60,6 +60,7 @@ describe('final handlers', () => {
     expect(JSON.stringify(response.body)).not.toContain('secret');
     expect(logs).toEqual(expect.arrayContaining([expect.objectContaining({ level: 'ERROR', target: 'bff-settings', message: 'request failed', status: 500 })]));
     expect(JSON.stringify(logs)).not.toContain('Anne');
+    expect(parseSpy).toHaveBeenCalled();
     jest.restoreAllMocks();
   });
 
