@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { assertConfigured } from '@mairie360/bffs-lib';
 import type { Server } from 'node:http';
 import app from './app';
+import { logger } from './logger';
 
 /** Every upstream service the BFF calls: `<SERVICE>_URL` (+ optional `<SERVICE>_PORT`) must be set. */
 export const UPSTREAMS = ['CORE_API'] as const;
@@ -13,7 +14,7 @@ export function start(port = Number(process.env.PORT ?? 4008)): Server {
   if (!process.env.JWT_SECRET?.trim()) {
     throw new Error('Missing configuration: JWT_SECRET');
   }
-  return app.listen(port, () => console.log(`Server listening on port ${port}`));
+  return app.listen(port, () => logger.info('server listening', { port }));
 }
 
 if (require.main === module) {

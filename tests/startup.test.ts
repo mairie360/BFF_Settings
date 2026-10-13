@@ -1,5 +1,6 @@
 import type { AddressInfo } from 'node:net';
 import { UPSTREAMS, start } from '../src/index';
+import { captureLogs } from './support/logs';
 
 describe('startup configuration check', () => {
   const saved = { url: process.env.CORE_API_URL, port: process.env.CORE_API_PORT };
@@ -41,7 +42,7 @@ describe('startup configuration check', () => {
 
   test('listens once every upstream is configured', async () => {
     process.env.CORE_API_URL = 'http://core:3000';
-    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    captureLogs();
 
     const server = start(0);
     await new Promise<void>((resolve) => server.once('listening', resolve));
@@ -54,7 +55,7 @@ describe('startup configuration check', () => {
     process.env.CORE_API_URL = 'http://core:3000';
     const savedPort = process.env.PORT;
     process.env.PORT = '0';
-    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    captureLogs();
 
     try {
       const server = start();

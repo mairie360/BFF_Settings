@@ -3,6 +3,7 @@ import type { Express } from 'express';
 import app from '../src/app';
 import { bearer } from './support/core-fixtures';
 import { ProfilePatchSchema } from '../src/routes/settings';
+import { captureLogs } from './support/logs';
 
 describe('application-wide security middleware', () => {
   test.each(['/health', '/unknown-route', '/settings/bootstrap'])('%s carries the strict API-only security headers and no X-Powered-By', async (pathname) => {
@@ -49,7 +50,7 @@ describe('final handlers', () => {
   });
 
   test('an unexpected error answers a generic 500 instead of 400, without its message', async () => {
-    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const logs = captureLogs();
     const parseSpy = jest.spyOn(ProfilePatchSchema, 'safeParse').mockImplementation(() => { throw new Error('secret internal detail'); });
 
     const response = await request(app).patch('/settings/profile').set('Authorization', bearer()).send({ first_name: 'Anne' });
@@ -57,9 +58,10 @@ describe('final handlers', () => {
     expect(response.status).toBe(500);
     expect(response.body).toEqual({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error', details: [] } });
     expect(JSON.stringify(response.body)).not.toContain('secret');
-    expect(errorSpy).toHaveBeenCalled();
-    parseSpy.mockRestore();
-    errorSpy.mockRestore();
+    expect(logs).toEqual(expect.arrayContaining([expect.objectContaining({ level: 'ERROR', target: 'bff-settings', message: 'request failed', status: 500 })]));
+    expect(JSON.stringify(logs)).not.toContain('Anne');
+    expect(parseSpy).toHaveBeenCalled();
+    jest.restoreAllMocks();
   });
 
   test('trusts no proxy unless TRUST_PROXY says so', () => {
