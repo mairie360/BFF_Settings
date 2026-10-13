@@ -40,8 +40,11 @@ beforeAll(async () => { await coreApi.start(); });
 afterAll(async () => { await coreApi.stop(); });
 beforeEach(() => {
   coreApi.reset();
-  // The bootstrap reads them on every call: tests about them override these replies.
-  coreApi.on('get', CORE.preferences, { body: preferences() }).on('get', CORE.notifications, { body: notificationSettings() });
+  // The bootstrap reads them on every call, alongside the profile (MAIR-525): tests about them override these replies.
+  coreApi
+    .on('get', CORE.sessions, { body: sessionsResult([]) })
+    .on('get', CORE.preferences, { body: preferences() })
+    .on('get', CORE.notifications, { body: notificationSettings() });
   // baseUrl() reads CORE_API_URL and CORE_API_PORT again on every request: no module reload.
   const url = new URL(coreApi.url);
   process.env.CORE_API_URL = url.hostname;
@@ -160,9 +163,8 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(response.headers['cache-control']).toBe('no-store');
       // Core's groups, role and status do not leave the BFF.
       expect(response.body).toEqual({ profile: profileOf(me), sessions, ...STORED, sources: ALL_AVAILABLE });
-      // The profile first (required), then the optional reads in parallel.
-      expect(upstreamSequence()[0]).toBe(called('GET', coreApiUrls.getGetMeUrl()));
-      expect(upstreamSequence().slice(1).sort()).toEqual([
+      expect(upstreamSequence().sort()).toEqual([
+        called('GET', coreApiUrls.getGetMeUrl()),
         called('GET', coreApiUrls.getGetActiveSessionsUrl()),
         called('GET', coreApiUrls.getGetMyNotificationSettingsUrl()),
         called('GET', coreApiUrls.getGetMyPreferencesUrl()),
@@ -173,6 +175,30 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
         expect(upstream.undeclaredQuery).toEqual([]);
         expect(upstream.body).toBeUndefined();
       }
+    });
+
+    test('MAIR-525: sends the four Core reads together, not the profile first', async () => {
+      const slow = { delayMs: 50 };
+      coreApi
+        .on('get', CORE.me, { body: meResponse(), ...slow })
+        .on('get', CORE.sessions, { body: sessionsResult([]), ...slow })
+        .on('get', CORE.preferences, { body: preferences(), ...slow })
+        .on('get', CORE.notifications, { body: notificationSettings(), ...slow });
+
+      const response = await withSession(request(app).get('/settings/bootstrap'));
+
+      expect(response.status).toBe(200);
+      expect(coreApi.requests).toHaveLength(4);
+      expect(coreApi.maxInFlight).toBe(4);
+    });
+
+    test('MAIR-525: a failed profile is still the answer when the other reads ran alongside it', async () => {
+      coreApi.on('get', CORE.me, coreError(500)).on('get', CORE.sessions, { body: sessionsResult([]) });
+
+      const response = await withSession(request(app).get('/settings/bootstrap'));
+
+      expect(response.status).toBe(502);
+      expectBffContract('get', '/settings/bootstrap', response);
     });
 
     test('strips internal session fields sent by Core', async () => {
@@ -278,7 +304,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
     });
 
     // A well-signed token Core refuses (revoked session): the BFF cannot know it, Core's 401 is kept.
-    test('preserves a Core 401 on the profile without reading sessions', async () => {
+    test('preserves a Core 401 on the profile', async () => {
       coreApi.on('get', CORE.me, coreError(401, ''));
 
       const response = await withSession(request(app).get('/settings/bootstrap'), SESSION_42);
@@ -286,7 +312,6 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(response.status).toBe(401);
       expectBffContract('get', '/settings/bootstrap', response);
       expect(response.body).toEqual({ error: { code: 'UNAUTHORIZED', message: 'Authentication required', details: [] } });
-      expect(coreApi.calls(CORE.sessions)).toHaveLength(0);
     });
 
     test.each([403, 404, 409])('turns an undeclared Core %i on the profile into a 502', async (status) => {
@@ -313,7 +338,6 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expectBffContract('get', '/settings/bootstrap', response);
       expect(response.body).toEqual({ error: { code: 'BAD_GATEWAY', message, details: [] } });
       expect(JSON.stringify(response.body)).not.toMatch(/database|proxy/);
-      expect(coreApi.calls(CORE.sessions)).toHaveLength(0);
     });
 
     test.each<[string, MockReply, number]>([

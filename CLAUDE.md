@@ -68,8 +68,8 @@ genuine one. Tests sign their tokens with the secret `tests/support/env.ts` sets
   without session (same `CORE_API_URL` as the real calls), returns 200 or 502 with the `CheckApisResponse`
   schema (`checkApisResponseSchema(['core_api'])`). Add a probe for any new upstream.
 - `routes/settings.ts` — the real work:
-  - `GET /settings/bootstrap` aggregates Core `/api/v1/user/me/` (required; failure = error), then in
-    parallel `/api/v1/sessions/`, `/api/v1/user/me/preferences/` and `/api/v1/user/me/notifications/`
+  - `GET /settings/bootstrap` reads, all four in parallel (MAIR-525), Core `/api/v1/user/me/` (required; failure =
+    error), `/api/v1/sessions/`, `/api/v1/user/me/preferences/` and `/api/v1/user/me/notifications/`
     (optional; a failure sets `sources.{sessions,preferences,notifications}: 'unavailable'` and the section
     to `null`). Session objects are re-parsed through a Zod schema, which strips internal fields like `token_hash`.
   - The profile carries `phone` (E.164, as Core answers it) and `phone_country`. A patch forwards the phone as
@@ -165,6 +165,8 @@ non-401/403 answer. The spec requires `bearerAuth` at the top level (`openapi.ts
 
 ## Gotchas
 
+- **ESLint** `no-await-in-loop` is an error (MAIR-525): independent upstream calls start together; a sequential loop
+  disables it on that line with a comment saying why. The mock server's `delayMs` + `maxInFlight` let a test check it.
 - **ESLint** uses only the flat `eslint.config.cjs` (the legacy `.eslintrc.js` was removed, like in the
   sibling BFFs).
 - **Node version.** `contracts.yml`, `cicd.yml` (`node_version: "24"`) and every Dockerfile stage use

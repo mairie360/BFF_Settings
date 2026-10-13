@@ -161,9 +161,10 @@ async function optionalRead<T>(read: () => Promise<T>): Promise<T | undefined> {
 }
 
 router.get('/bootstrap', async (req, res) => {
-  const profile = await readProfile(req);
-  // Sessions, preferences and notification settings are optional: each failure only marks its source.
-  const [sessions, preferences, notifications] = await Promise.all([
+  // The four reads are independent: they start together (MAIR-525). The profile is required (its failure is the
+  // answer); sessions, preferences and notification settings are optional: each failure only marks its source.
+  const [profile, sessions, preferences, notifications] = await Promise.all([
+    readProfile(req),
     optionalRead(async () => SessionsResultSchema.parse((await coreApi.getActiveSessions(asCaller('CORE_API', req))).data).sessions),
     optionalRead(async () => CorePreferencesSchema.parse((await coreApi.getMyPreferences(asCaller('CORE_API', req))).data)),
     optionalRead(async () => CoreNotificationsSchema.parse((await coreApi.getMyNotificationSettings(asCaller('CORE_API', req))).data)),
