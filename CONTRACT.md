@@ -24,4 +24,4 @@ Le générateur de types est fixé à `openapi-typescript@7.10.1`. Il est exécu
 
 ## Sources
 
-Configurer `CORE_API_URL` (et `CORE_API_PORT` si nécessaire). Le profil utilise les champs Core `first_name`, `last_name`, `email`, `phone`, sans découper un nom complet. La sauvegarde est relue depuis Core. Les sessions excluent les champs internes. Les autres panneaux indiquent leur indisponibilité ; les adaptateurs de préférences préservent la réponse Core et ne créent aucun stockage local.
+Configurer `CORE_API_URL` (et `CORE_API_PORT` si nécessaire). Le profil utilise les champs Core `first_name`, `last_name`, `email`, `phone`, `phone_country`, sans découper un nom complet. La sauvegarde est relue depuis Core. Les sessions excluent les champs internes. Les autres panneaux indiquent leur indisponibilité ; les adaptateurs de préférences préservent la réponse Core et ne créent aucun stockage local.

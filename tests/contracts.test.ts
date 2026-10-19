@@ -2,6 +2,7 @@ import axios from 'axios';
 import request from 'supertest';
 import { readFileSync } from 'node:fs';
 import app from '../src/app';
+import { bearer } from './support/core-fixtures';
 
 // Les appels à Core API passent par le client généré : les autres comportements du BFF sont vérifiés
 // contre un vrai serveur HTTP piloté par le contrat (settings.upstream-mocks.test.ts).
@@ -28,7 +29,7 @@ test('bootstrap rejects a missing session before contacting upstream services', 
 test('unsupported profile fields never report a successful save', async () => {
   const result = await request(app)
     .patch('/settings/profile')
-    .set('Authorization', 'Bearer test-session')
+    .set('Authorization', bearer())
     .send({ fullName: 'Anne Marie Le Gall', roles: ['Admin'] });
 
   expect(result.status).toBe(400);

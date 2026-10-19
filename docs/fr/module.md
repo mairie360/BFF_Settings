@@ -13,7 +13,7 @@ Domaine fonctionnel: Paramètres personnels.
 ## Fonctions disponibles
 
 - Chargement du profil et des sessions, avec disponibilité des sessions séparée.
-- Modification partielle du prénom, nom, e-mail et téléphone.
+- Modification partielle du prénom, nom, e-mail et téléphone (avec son pays).
 - Préférences notifications, apparence et général, lues et enregistrées via Core API.
 
 ## Parcours type
@@ -30,7 +30,7 @@ Ce dépôt contient le serveur BFF et son contrat. Les web services associés po
 
 ## Données et état actuel
 
-Le profil vient de Core `/api/v1/user/me/`; les sessions viennent de `/api/v1/sessions/`. Les champs sont `first_name`, `last_name`, `email` et `phone`. Le schéma des sessions ne conserve que les informations affichables et retire les champs internes. Les préférences viennent de Core `/api/v1/user/me/preferences/` (apparence et général) et `/api/v1/user/me/notifications/` ; aucune préférence n’est stockée localement par le BFF.
+Le profil vient de Core `/api/v1/user/me/`; les sessions viennent de `/api/v1/sessions/`. Les champs sont `first_name`, `last_name`, `email`, `phone` et `phone_country`. Le schéma des sessions ne conserve que les informations affichables et retire les champs internes. Les préférences viennent de Core `/api/v1/user/me/preferences/` (apparence et général) et `/api/v1/user/me/notifications/` ; aucune préférence n’est stockée localement par le BFF.
 
 ## Périmètre et limites
 

@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { getCoreAPIMairie360 } from '@mairie360/core-api-openapi/endpoints/coreAPIMairie360';
 import type {
   GetMeResponseView, GetSessionsResultView, Group, PatchMeView, SessionSchema, UserNotificationSettings, UserPreferences,
@@ -20,7 +21,8 @@ export function meResponse(overrides: Partial<GetMeResponseView> = {}): GetMeRes
     email: 'anne.le-gall@mairie.test',
     first_name: 'Anne Marie',
     last_name: 'Le Gall',
-    phone: '0123456789',
+    phone: '+33123456789',
+    phone_country: 'FR',
     role: 'User',
     roles: ['User'],
     status: 'active',
@@ -30,9 +32,9 @@ export function meResponse(overrides: Partial<GetMeResponseView> = {}): GetMeRes
 }
 
 /** Profil attendu en sortie du BFF pour un corps `GET /api/v1/user/me/`. */
-export function profileOf(me: GetMeResponseView): Pick<GetMeResponseView, 'first_name' | 'last_name' | 'email' | 'phone'> {
-  const { first_name, last_name, email, phone } = me;
-  return { first_name, last_name, email, phone };
+export function profileOf(me: GetMeResponseView): Pick<GetMeResponseView, 'first_name' | 'last_name' | 'email' | 'phone' | 'phone_country'> {
+  const { first_name, last_name, email, phone, phone_country } = me;
+  return { first_name, last_name, email, phone, ...(phone_country === undefined ? {} : { phone_country }) };
 }
 
 /** Corps de `PATCH /api/v1/user/me/` (PatchMeView). */
@@ -54,8 +56,20 @@ export function session(id: string, overrides: Partial<SessionSchema> = {}): Ses
 /** Corps de `GET /api/v1/sessions/` (GetSessionsResultView). */
 export const sessionsResult = (sessions: SessionSchema[]): GetSessionsResultView => ({ sessions });
 
-/** Le BFF Settings ne vérifie que la forme `Bearer <jeton>` : le jeton est transmis tel quel à Core API (simulée). */
-export const bearer = (token = 'session-anne') => `Bearer ${token}`;
+/** Secret of the tests (tests/support/env.ts): the BFF verifies the session tokens with it (bffs-lib requireSession). */
+export const JWT_SECRET = 'settings-contract-test-secret';
+
+/** HS256 session token of `userId` signed with `secret`, valid one hour (expired when `expiresIn` is negative). */
+export function sessionToken(userId: number | string, secret = JWT_SECRET, expiresIn = 3_600): string {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({ sub: String(userId), exp: Math.floor(Date.now() / 1000) + expiresIn })).toString('base64url');
+  return `${header}.${payload}.${createHmac('sha256', secret).update(`${header}.${payload}`).digest('base64url')}`;
+}
+
+/** Sessions of Anne (user 7) and of user 42: the BFF verifies them, then forwards them as is to Core API (mock). */
+export const SESSION_ANNE = sessionToken(7);
+export const SESSION_42 = sessionToken(42);
+export const bearer = (token = SESSION_ANNE) => `Bearer ${token}`;
 
 /** Body of `GET`/`PATCH /api/v1/user/me/preferences/` (UserPreferences). */
 export function preferences(overrides: Partial<UserPreferences> = {}): UserPreferences {

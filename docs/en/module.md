@@ -13,7 +13,7 @@ Business domain: Personal settings.
 ## Available capabilities
 
 - Load profile and sessions with separate session availability.
-- Partially update first name, last name, email and phone.
+- Partially update first name, last name, email and phone (with its country).
 - Notification, appearance and general preferences, read and saved through Core API.
 
 ## Typical workflow
@@ -30,7 +30,7 @@ This repository contains the BFF server and its contract. Associated web service
 
 ## Data and current state
 
-The profile comes from Core `/api/v1/user/me/`; sessions come from `/api/v1/sessions/`. Fields are `first_name`, `last_name`, `email` and `phone`. The session schema retains displayable information and removes internal fields. Preferences come from Core `/api/v1/user/me/preferences/` (appearance and general) and `/api/v1/user/me/notifications/`; the BFF stores no preferences locally.
+The profile comes from Core `/api/v1/user/me/`; sessions come from `/api/v1/sessions/`. Fields are `first_name`, `last_name`, `email`, `phone` and `phone_country`. The session schema retains displayable information and removes internal fields. Preferences come from Core `/api/v1/user/me/preferences/` (appearance and general) and `/api/v1/user/me/notifications/`; the BFF stores no preferences locally.
 
 ## Scope and limitations
 
