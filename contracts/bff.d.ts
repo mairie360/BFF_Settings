@@ -122,6 +122,17 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
                 /** @description Profile unavailable */
                 502: {
                     headers: {
@@ -221,6 +232,17 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
                 /** @description Core is unavailable, failed or answered an unexpected status */
                 502: {
                     headers: {
@@ -290,6 +312,17 @@ export interface paths {
                 /** @description Missing, forged or expired session token, or a session Core refuses */
                 401: {
                     headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
                         [name: string]: unknown;
                     };
                     content: {
@@ -371,6 +404,17 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
                 /** @description Core is unavailable, failed or answered an unexpected status */
                 502: {
                     headers: {
@@ -440,6 +484,17 @@ export interface paths {
                 /** @description Missing, forged or expired session token, or a session Core refuses */
                 401: {
                     headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
                         [name: string]: unknown;
                     };
                     content: {

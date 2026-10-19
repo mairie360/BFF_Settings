@@ -10,6 +10,12 @@ const errorContent = { content: { 'application/json': { schema: ErrorSchema } } 
 // invalid answer), Core not configured.
 const upstreamErrors = {
   401: { description: 'Missing, forged or expired session token, or a session Core refuses', ...errorContent },
+  // bffs-lib >= 2.4.0 relays a Core 429 with its Retry-After instead of a 502 (MAIR-562).
+  429: {
+    description: 'Core rate limit reached: retry after the Retry-After header (seconds)',
+    headers: { 'Retry-After': { description: 'Seconds to wait before retrying', schema: { type: 'integer' as const } } },
+    ...errorContent,
+  },
   502: { description: 'Core is unavailable, failed or answered an unexpected status', ...errorContent },
   503: { description: 'Core or JWT_SECRET is not configured', ...errorContent },
 };

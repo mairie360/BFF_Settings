@@ -684,6 +684,24 @@
               }
             }
           },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "502": {
             "description": "Profile unavailable",
             "content": {
@@ -770,6 +788,24 @@
               }
             }
           },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "502": {
             "description": "Core is unavailable, failed or answered an unexpected status",
             "content": {
@@ -828,6 +864,24 @@
           },
           "401": {
             "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -902,6 +956,24 @@
               }
             }
           },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "502": {
             "description": "Core is unavailable, failed or answered an unexpected status",
             "content": {
@@ -960,6 +1032,24 @@
           },
           "401": {
             "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
