@@ -125,6 +125,8 @@ export interface paths {
                 /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
                 429: {
                     headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
                         [name: string]: unknown;
                     };
                     content: {
@@ -233,6 +235,8 @@ export interface paths {
                 /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
                 429: {
                     headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
                         [name: string]: unknown;
                     };
                     content: {
@@ -317,6 +321,8 @@ export interface paths {
                 /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
                 429: {
                     headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
                         [name: string]: unknown;
                     };
                     content: {
@@ -401,6 +407,8 @@ export interface paths {
                 /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
                 429: {
                     headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
                         [name: string]: unknown;
                     };
                     content: {
@@ -485,6 +493,8 @@ export interface paths {
                 /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
                 429: {
                     headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
                         [name: string]: unknown;
                     };
                     content: {

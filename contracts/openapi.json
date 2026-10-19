@@ -686,6 +686,14 @@
           },
           "429": {
             "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -782,6 +790,14 @@
           },
           "429": {
             "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -858,6 +874,14 @@
           },
           "429": {
             "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -934,6 +958,14 @@
           },
           "429": {
             "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -1010,6 +1042,14 @@
           },
           "429": {
             "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
