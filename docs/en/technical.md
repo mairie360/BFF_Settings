@@ -55,6 +55,8 @@ Values below are local examples or explicitly described behavior, not production
 | `CORE_API_URL` | http://localhost:3000 | Required. Core base address (scheme optional, `http` by default), without a route suffix; read on every call, 503 when missing or invalid. |
 | `CORE_API_PORT` | — | Optional port when absent from the URL. |
 | `TRUST_PROXY` | unset (no proxy trusted) | Express `trust proxy` (`true`, a hop count or addresses/subnets), so `req.ip` is the real client behind the ingress. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset (telemetry off) | OpenTelemetry collector of the instance, e.g. `http://otel-collector:4318`: traces and HTTP metrics are exported over OTLP (MAIR-504). Only the method, status, parameterised route and upstream host leave the BFF, never a URL, query string, header, id or IP. |
+| `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` | `bff-settings`; unset | Override the service name; extra resource attributes such as `service.version=<image tag>,deployment.environment.name=prod`. `OTEL_SDK_DISABLED=true` turns telemetry off. |
 
 ## Routes and data contract
 
