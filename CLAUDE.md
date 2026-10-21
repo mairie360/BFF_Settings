@@ -27,6 +27,7 @@ npm run contracts:check     # fail if either committed artifact is stale (runs i
 
 ./performance_test.sh       # isolated k6 load test  (docker-compose-performance.yml)
 ./security_test.sh          # isolated OWASP ZAP DAST (docker-compose-security.yml)
+./integration_test.sh       # docker-compose-integration.yml: real Core API + newman replaying tests/postman/ (MAIR-262)
 ```
 
 Run `contracts:generate` and commit the result whenever you change a route path, method, or Zod
@@ -161,6 +162,46 @@ every service to the first `min(PERF_CPUS, nproc)` CPUs (4 by default, like the 
   `home_page` = `/general` (the last path segment), a valid in-app path Core (MAIR-479) accepts, and a random
   mixed-case value Core refuses, and reads the difference as a traversal; `home_page` is never read as a file.
 
+## Integration tests on the real stack (MAIR-262)
+
+Jest tests mock Core API; `integration_test.sh` is the only test of the BFF on a real stack. It brings up
+`docker-compose-integration.yml` (the upstream services of the ZAP / k6 stacks: published Core API image,
+database + liquibase + `init-test.sql`, Redis; no fake Resend, no route of this BFF sends an e-mail) and a
+`newman` service that replays `tests/postman/collection.json` with `tests/postman/environment.json` against
+the BFF, `--bail` on the first failing request; the exit code of newman is the exit code of the script. Like
+the other stacks it tests the image named by `IMAGE_REF` (`bff-settings:local` built from
+`development.Dockerfile` when empty), sources `stack_secrets.sh` (random `JWT_SECRET` per run) and drops the
+volumes before and after. In CI it is the `integration_tests` staging gate of `promote-staging.yml`
+(mairie360/CICD `integration/bffs`) on the published `dev-<sha>` image: a failure blocks the promotion; the
+junit report (`newman-reports/newman.xml`, gitignored) is published as job summary and artifact.
+
+The collection is split in two kinds of checks, both on the BFF's own routes:
+
+- **working checks** (folders `Service`, `Session resolution`): the BFF starts, `/health`, `/check_apis`,
+  `/openapi.json`, a JSON 404, the session is resolved against Core API (401 without a Bearer, the seeded
+  Admin `sub=1` and agent `sub=2` through `GET /settings/bootstrap`, every `sources` entry `available`, a
+  user who never saved anything gets every setting `null`);
+- **business journeys** the Settings front relies on, as the seeded agent: the profile round trip (names
+  and a national phone answered in E.164, the whole form with the unchanged e-mail saved without password,
+  an e-mail change with a wrong `current_password` refused with Core's 403, the seed restored), the
+  appearance and general sections sharing one Core preferences record (a PATCH keeps the other section and
+  the unsent fields; the administrator's settings stay untouched), the notification settings, every value
+  read back through the bootstrap, and `null` resetting every field so the agent ends as seeded.
+
+The seeded accounts have no known password: the collection-level pre-request script forges their JWTs
+(HS256 `{ sub, role, exp }`, like `mairie360_api_lib`) with the `jwt_secret` the compose file injects
+(`jwt_admin`, `jwt_agent`); the committed `environment.json` holds no secret or token. The settings are
+stored by Core API per user (`/api/v1/user/me/preferences/`, `/api/v1/user/me/notifications/`), nothing in
+the BFF: the collection restores the seeded values at the end so it is replayable on the same stack, and a
+fresh `run_id` names what it writes. Isolated endpoint checks (validation errors, token refusals) stay in
+jest: the collection only holds journeys and the checks that need a real Core.
+
+`tests/integration-collection.test.ts` guards the collection with the unit tests: every operation of
+`contracts/openapi.json` has at least one request (a new route needs its request), every request has a
+`pm.test`, every request targets a declared route (or `/openapi.json` / the 404 check), and the environment
+commits no secret. The collection is generated for now from a session script; edit the JSON directly
+(Postman v2.1), keeping one folder per journey and English names.
+
 ## ZAP OpenAPI coverage gate
 
 `security_test.sh` / `performance_test.sh` clone `mairie360/CICD` into `cicd-repo/` (gitignored) at
@@ -218,5 +259,5 @@ Every PR requests a review from the whole team, minus its author: `CarolinHugo`,
 A push to `main` only releases dev (`cicd.yml` stops at `release-dev`). Staging and prod are manual:
 `gh workflow run promote-staging.yml -R mairie360/BFF_Settings` (main's newest commit) or `gh workflow run promote-staging.yml -R mairie360/BFF_Settings -f sha=SHA` (a given commit), then the same with `promote-prod.yml`
 (environments `Staging` / `Prod`). Staging refuses a commit without `dev-<sha>` and a green main run, and runs
-the ZAP and k6 stacks on that image; prod refuses one without `staging-<sha>` and tags the version semantic-release computes
+the integration (newman, MAIR-262), ZAP and k6 stacks on that image; prod refuses one without `staging-<sha>` and tags the version semantic-release computes
 for that commit. `cicd.yml`, `promote-staging.yml` and `promote-prod.yml` pin the same mairie360/CICD release.
