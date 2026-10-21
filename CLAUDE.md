@@ -187,7 +187,7 @@ non-401/403 answer. The spec requires `bearerAuth` at the top level (`openapi.ts
   so the sync branch is an inert stub — syncing to web-service repos is not wired up here.
 - `.npmrc` points `@mairie360:*` at GitHub Packages and needs `NODE_AUTH_TOKEN`; the only `@mairie360/*`
   package is the `core-api-openapi` devDependency used by the tests (no runtime client).
-- `cicd.yml` calls the shared `mairie360/CICD` `BFFs-cicd.yml@v4.4.0` (with `openapi_spec_path` and
+- `cicd.yml` calls the shared `mairie360/CICD` `BFFs-cicd.yml@v4.4.3` (with `openapi_spec_path` and
   explicit `CODECOV_TOKEN` / `N8N_WEBHOOK_SECRET` secrets); Renovate keeps `cicd_version` aligned with
   the tag, and `.releaserc.json` drives semantic-release.
 - The test stacks pin the dev releases `database` / `liquibase-migrations` `dev-90c22bb` and `core-api`
