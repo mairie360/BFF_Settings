@@ -16,7 +16,7 @@ The system panel of the web service reports unavailability. Security displays se
 
 ## Installation and local startup
 
-Use Node.js 22 to reproduce the contract job and npm with the committed lockfile. Other job and Docker versions are detailed below.
+Use Node.js 24.22.1 to reproduce the contract job and npm with the committed lockfile. Other job and Docker versions are detailed below.
 
 Current direct dependencies include no private `@mairie360/*` client. `.npmrc` still retains the organization’s registry configuration.
 
