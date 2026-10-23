@@ -27,4 +27,7 @@ RUN --mount=type=secret,id=npmrc,target=/app/.npmrc \
 # On copie le reste du code source
 COPY . .
 
+RUN chown -R node:node /app
+USER node
+
 CMD ["npm", "run", "start"]
