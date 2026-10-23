@@ -12,7 +12,7 @@ the web service consumes. It holds no database and no local state.
 ## Commands
 
 ```bash
-npm ci                      # install (Node.js 24 in both workflows and the Docker images)
+npm ci                      # install (Node.js 24.22.1 in both workflows and the Docker images)
 npm run start               # ts-node src/index.ts, listens on PORT (default 4008)
 npm run build               # tsc -> dist/
 npm run lint                # eslint (flat config: eslint.config.cjs)
@@ -226,8 +226,8 @@ non-401/403 answer. The spec requires `bearerAuth` at the top level (`openapi.ts
   disables it on that line with a comment saying why. The mock server's `delayMs` + `maxInFlight` let a test check it.
 - **ESLint** uses only the flat `eslint.config.cjs` (the legacy `.eslintrc.js` was removed, like in the
   sibling BFFs).
-- **Node version.** `contracts.yml`, `cicd.yml` (`node_version: "24"`) and every Dockerfile stage use
-  Node 24; the images pin `node:24-alpine` by digest (Renovate bumps it).
+- **Node version.** `contracts.yml`, `cicd.yml` (`node_version: "24.22.1"`) and every Dockerfile stage use
+  Node 24.22.1; the images pin `node:24.22.1-alpine` by digest (Renovate bumps it).
 - **Fail fast.** `src/index.ts` loads `dotenv/config` first, then `start()` runs the lib's
   `assertConfigured(UPSTREAMS)` (`['CORE_API']`) before `listen`, only under `require.main === module`.
   Add any new upstream to `UPSTREAMS`.
