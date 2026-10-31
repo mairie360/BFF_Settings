@@ -12,7 +12,7 @@ the web service consumes. It holds no database and no local state.
 ## Commands
 
 ```bash
-npm ci                      # install (Node.js 24 in both workflows and the Docker images)
+npm ci                      # install (Node.js 24.22.1 in both workflows and the Docker images)
 npm run start               # ts-node src/index.ts, listens on PORT (default 4008)
 npm run build               # tsc -> dist/
 npm run lint                # eslint (flat config: eslint.config.cjs)
@@ -27,6 +27,7 @@ npm run contracts:check     # fail if either committed artifact is stale (runs i
 
 ./performance_test.sh       # isolated k6 load test  (docker-compose-performance.yml)
 ./security_test.sh          # isolated OWASP ZAP DAST (docker-compose-security.yml)
+./integration_test.sh       # docker-compose-integration.yml: real Core API + newman replaying tests/postman/ (MAIR-262)
 ```
 
 Run `contracts:generate` and commit the result whenever you change a route path, method, or Zod
@@ -36,8 +37,13 @@ schema — CI (`contracts:check`) and a jest test both fail otherwise. See "Cont
 
 **Request flow:** `src/index.ts` -> `src/app.ts` mounts three routers (`/health`, `/check_apis`,
 `/settings`). Every `/settings` request goes through the lib's `noStore` (`Cache-Control: no-store`)
-and `requireBearer` (401 before any Core call without `Authorization: Bearer <token>`; cookies and
-`x-session-token` are ignored). `trust proxy` comes from `TRUST_PROXY` (lib `parseTrustProxy`).
+and `requireSession` (bffs-lib >= 1.2.0, MAIR-474: 401 before any Core call unless `Authorization: Bearer <token>`
+carries a token verified with `JWT_SECRET`, HS256 with `exp` and a positive `sub`; cookies and
+`x-session-token` are ignored; 503 without `JWT_SECRET`, and `start()` refuses to listen without it). Core
+still checks revocation. `tests/token-refusals.test.ts` walks `contracts/openapi.json`: every operation that
+inherits `bearerAuth` answers 401 to a missing or forged token (other scheme, garbage, other secret, expired,
+`alg: none`, swapped payload, RS256, non-numeric `sub`) without calling Core and gets past the check with a
+genuine one. Tests sign their tokens with the secret `tests/support/env.ts` sets (`sessionToken`, `bearer()`). `trust proxy` comes from `TRUST_PROXY` (lib `parseTrustProxy`).
 
 **Errors (`@mairie360/bffs-lib`).** Every error body is `{ error: { code, message, details } }`, the
 `ErrorResponse` schema (`src/openapi-registry.ts`, the lib's `ErrorResponseSchema.clone()`). Routes throw
@@ -63,10 +69,12 @@ and `requireBearer` (401 before any Core call without `Authorization: Bearer <to
   without session (same `CORE_API_URL` as the real calls), returns 200 or 502 with the `CheckApisResponse`
   schema (`checkApisResponseSchema(['core_api'])`). Add a probe for any new upstream.
 - `routes/settings.ts` — the real work:
-  - `GET /settings/bootstrap` aggregates Core `/api/v1/user/me/` (required; failure = error), then in
-    parallel `/api/v1/sessions/`, `/api/v1/user/me/preferences/` and `/api/v1/user/me/notifications/`
+  - `GET /settings/bootstrap` reads, all four in parallel (MAIR-525), Core `/api/v1/user/me/` (required; failure =
+    error), `/api/v1/sessions/`, `/api/v1/user/me/preferences/` and `/api/v1/user/me/notifications/`
     (optional; a failure sets `sources.{sessions,preferences,notifications}: 'unavailable'` and the section
     to `null`). Session objects are re-parsed through a Zod schema, which strips internal fields like `token_hash`.
+  - The profile carries `phone` (E.164, as Core answers it) and `phone_country`. A patch forwards the phone as
+    typed (Core MAIR-480 parses it against `phone_country`, or its `+` prefix, and clears it on `null`/`""`).
   - `PATCH /settings/profile` validates with the lib's `parseRequest(ProfilePatchSchema, req.body, 'body')`
     (`.strict()`: unknown fields are a 400 `Validation failed` with `body.<field>` details) and refuses an
     empty patch with the same 400 (never a silent success), PATCHes Core, then **re-reads** and returns the
@@ -81,6 +89,13 @@ and `requireBearer` (401 before any Core call without `Authorization: Bearer <to
     section's fields from Core's answer (missing = `null`).
   - Every `/settings` route documents 401/502/503 through `upstreamErrors`; the contract tests fail on
     any status the route can return but does not declare.
+
+### Telemetry (MAIR-504)
+
+`src/telemetry.ts` calls the lib's `startTelemetry` and is imported by `src/index.ts` right after `dotenv/config`,
+before the app: the Express instrumentation only hooks Express if it is not loaded yet (Express stays external in
+the esbuild bundle). Off without `OTEL_EXPORTER_OTLP_ENDPOINT`; the lib exports only an attribute allowlist, so
+never add span attributes holding request values (ids, URLs, bodies, headers). Tests export nothing.
 
 ## Contract pipeline
 
@@ -113,30 +128,88 @@ version, the consumed operations, BFF↔Core schema compatibility and the known 
 - Fixtures live in `tests/support/core-fixtures.ts` and are validated against the contract.
 - `openapi-contract.ts`, `contract-mock-server.ts` and `orval-contract.ts` are shared verbatim with `BFF_user`,
   `BFF_Calendar`, `BFF_Dashboard`, `BFF_Elearning` and `BFF_Message`; keep the copies identical.
-- `.npmrc` sets `min-release-age=7`: npm 11 refuses a freshly published `@mairie360/*` version unless run with
-  `--min-release-age=0`.
 
 ## Isolated test stacks (perf / security)
 
 Mirrors the Calendar BFF / APIs pattern: two standalone Compose stacks driven by shell scripts that
 return the tool's exit code (`docker-compose-{performance,security}.yml`, `performance_test.sh`,
 `security_test.sh`). Both bring up `database` + `liquibase-migrations` + `seeder` (`init-test.sql`,
-user id 2) + `redis` + `core-api` (probed by a curl sidecar — the published image is distroless) +
-the BFF image named by `IMAGE_REF` (in CI, the image published by `release-dev`; locally,
-`bff-settings:local`, built by the scripts from `development.Dockerfile` when `IMAGE_REF` is empty).
+user id 2) + `redis` + `core-api` (probed on `/ready` by a curl sidecar — the published image is
+distroless) + the BFF image named by `IMAGE_REF` (in CI, the image published by `release-dev`; locally,
+`bff-settings:local`, built by the scripts from `development.Dockerfile` when `IMAGE_REF` is empty). No
+`bff-user`: BFF_Settings never calls it.
 
-- **Performance** — k6 (`load-test.js`) has one handler per operation of the contract, minting an
-  HS256 JWT (`sub=2`) with the same secret as `core-api` (`b"secret"`). Scenarios: `crud` (2 VUs) runs
-  every handler through `coverage.run()` (writes included, the profile patch restores the seed) and
-  carries the coverage gate; `reads` (ramp to 20 VUs) replays the GET handlers. Thresholds: one
-  `p(95)` per operation by family (`/health` 50 ms, `/check_apis` 150 ms, reads 400 ms, writes
-  800 ms), `http_req_failed < 1%`, `checks > 99%`. The three preference PATCHes expect 200.
-- **Security** — OWASP ZAP imports `/openapi.json`, replays every operation with a static JWT via a
-  header replacer, and fails on any alert not downgraded to `IGNORE` in `.zap/rules.tsv`. Expect one
-  round of `rules.tsv` tuning after the first real run.
+Both scripts source `stack_secrets.sh` (MAIR-474): a random `JWT_SECRET` per run, shared by core-api, the
+BFF and k6, and `ADMIN_JWT` (`sub=1`, 4 h) signed with it for the ZAP replacer; the compose files refuse to
+start without them. They drop the volumes before and after a run, exit 1 when a dependency does not start
+(`docker compose wait` would report 0 for a test container that never ran), and `performance_test.sh` pins
+every service to the first `min(PERF_CPUS, nproc)` CPUs (4 by default, like the CI runner).
 
-`rules.tsv` neutralises informational alerts only; if `core-api` responds 5xx on a half-wired route the
-scan will surface it — fix or triage rather than blanket-ignoring.
+- **Performance** — k6 (`load-test.js`) has one handler per operation of the contract and mints HS256
+  JWTs with the run's secret. The perf seeder also runs `init-perf.sql`, BFF_user's Core seed copied as is
+  (10 000 agents `500001`-`510000` with five sessions each; keep it in step with BFF_user and the id ranges
+  of `load-test.js`). Scenarios: `crud` runs every handler through `coverage.run()` and carries the coverage
+  gate, each VU writing as its own agent (the last ten) so the handlers check what Core stored (the phone in
+  E.164, then cleared; each preference value); `reads` replays the GET handlers as random agents and checks
+  their own profile, session and sources; `bootstrap_rush` sends `GET /settings/bootstrap` at a fixed rate.
+  Thresholds: one `p(95)` per operation by family (`/health` 50 ms, `/check_apis` 150 ms, reads 400 ms,
+  writes 800 ms), strict `checks == 100%`, `http_req_failed == 0`, `dropped_iterations == 0`.
+  `K6_PROFILE`: `ci` (default, 30 readers, rush at 30/s, what the 4 vCPU runner holds) or `stress` (100
+  readers, 100/s, by hand).
+- **Security** — OWASP ZAP imports `/openapi.json`, replays every operation with `ADMIN_JWT` via a header
+  replacer, and fails on any alert not downgraded in `.zap/rules.tsv`. Rule `100000` (server errors) is no
+  longer ignored. Rule `6` (Path Traversal) is scoped out of `PATCH /settings/general` only: ZAP sends
+  `home_page` = `/general` (the last path segment), a valid in-app path Core (MAIR-479) accepts, and a random
+  mixed-case value Core refuses, and reads the difference as a traversal; `home_page` is never read as a file.
+
+## Integration tests on the real stack (MAIR-262)
+
+Jest tests mock Core API; `integration_test.sh` is the only test of the BFF on a real stack. It brings up
+`docker-compose-integration.yml` (the upstream services of the ZAP / k6 stacks: published Core API image,
+database + liquibase + `init-test.sql`, Redis; no fake Resend, no route of this BFF sends an e-mail) and a
+`newman` service that replays `tests/postman/collection.json` with `tests/postman/environment.json` against
+the BFF, `--bail` on the first failing request; the exit code of newman is the exit code of the script. Like
+the other stacks it tests the image named by `IMAGE_REF` (`bff-settings:local` built from
+`development.Dockerfile` when empty), sources `stack_secrets.sh` (random `JWT_SECRET` per run) and drops the
+volumes before and after. In CI it is the `integration_tests` staging gate of `promote-staging.yml`
+(mairie360/CICD `integration/bffs`) on the published `dev-<sha>` image: a failure blocks the promotion; the
+junit report (`newman-reports/newman.xml`, gitignored) is published as job summary and artifact.
+
+The collection is split in two kinds of checks, both on the BFF's own routes:
+
+- **working checks** (folders `Service`, `Session resolution`): the BFF starts, `/health`, `/check_apis`,
+  `/openapi.json`, a JSON 404, the session is resolved against Core API (401 without a Bearer, the seeded
+  Admin `sub=1` and agent `sub=2` through `GET /settings/bootstrap`, every `sources` entry `available`, a
+  user who never saved anything gets every setting `null`);
+- **business journeys** the Settings front relies on, as the seeded agent: the profile round trip (names
+  and a national phone answered in E.164, the whole form with the unchanged e-mail saved without password,
+  an e-mail change with a wrong `current_password` refused with Core's 403, the seed restored), the
+  appearance and general sections sharing one Core preferences record (a PATCH keeps the other section and
+  the unsent fields; the administrator's settings stay untouched), the notification settings, every value
+  read back through the bootstrap, and `null` resetting every field so the agent ends as seeded.
+
+The seeded accounts have no known password: the collection-level pre-request script forges their JWTs
+(HS256 `{ sub, role, exp }`, like `mairie360_api_lib`) with the `jwt_secret` the compose file injects
+(`jwt_admin`, `jwt_agent`); the committed `environment.json` holds no secret or token. The settings are
+stored by Core API per user (`/api/v1/user/me/preferences/`, `/api/v1/user/me/notifications/`), nothing in
+the BFF: the collection restores the seeded values at the end so it is replayable on the same stack, and a
+fresh `run_id` names what it writes. Isolated endpoint checks (validation errors, token refusals) stay in
+jest: the collection only holds journeys and the checks that need a real Core.
+
+`tests/integration-collection.test.ts` guards the collection with the unit tests: every operation of
+`contracts/openapi.json` has at least one request (a new route needs its request), every request has a
+`pm.test`, every request targets a declared route (or `/openapi.json` / the 404 check), and the environment
+commits no secret. The collection is generated for now from a session script; edit the JSON directly
+(Postman v2.1), keeping one folder per journey and English names.
+
+### Non-regression tests of a bug fix
+
+Every bug fix ships three tests that fail on the old code and pass on the fix, named after the ticket or the bug:
+a **technical unit test** (jest: the upstream-mock suite or the unit test of the route / helper), a **technical
+integration test** (a request of `tests/postman/collection.json` that reproduces the bug on the real stack and pins
+the status, the error envelope and the answer's fields) and a **business integration test** (the journey of the
+collection that the bug broke, extended so that it replays the user flow end to end). Run `./integration_test.sh`
+before opening the PR; skip one of the three only when that layer cannot observe the bug, and say why in the PR.
 
 ## ZAP OpenAPI coverage gate
 
@@ -149,10 +222,12 @@ non-401/403 answer. The spec requires `bearerAuth` at the top level (`openapi.ts
 
 ## Gotchas
 
+- **ESLint** `no-await-in-loop` is an error (MAIR-525): independent upstream calls start together; a sequential loop
+  disables it on that line with a comment saying why. The mock server's `delayMs` + `maxInFlight` let a test check it.
 - **ESLint** uses only the flat `eslint.config.cjs` (the legacy `.eslintrc.js` was removed, like in the
   sibling BFFs).
-- **Node version.** `contracts.yml`, `cicd.yml` (`node_version: "24"`) and every Dockerfile stage use
-  Node 24; the images pin `node:24-alpine` by digest (Renovate bumps it).
+- **Node version.** `contracts.yml`, `cicd.yml` (`node_version: "24.22.1"`) and every Dockerfile stage use
+  Node 24.22.1; the images pin `node:24.22.1-alpine` by digest (Renovate bumps it).
 - **Fail fast.** `src/index.ts` loads `dotenv/config` first, then `start()` runs the lib's
   `assertConfigured(UPSTREAMS)` (`['CORE_API']`) before `listen`, only under `require.main === module`.
   Add any new upstream to `UPSTREAMS`.
@@ -162,11 +237,11 @@ non-401/403 answer. The spec requires `bearerAuth` at the top level (`openapi.ts
   so the sync branch is an inert stub — syncing to web-service repos is not wired up here.
 - `.npmrc` points `@mairie360:*` at GitHub Packages and needs `NODE_AUTH_TOKEN`; the only `@mairie360/*`
   package is the `core-api-openapi` devDependency used by the tests (no runtime client).
-- `cicd.yml` calls the shared `mairie360/CICD` `BFFs-cicd.yml@v2.3.0` (with `openapi_spec_path` and
+- `cicd.yml` calls the shared `mairie360/CICD` `BFFs-cicd.yml@v4.5.0` (with `openapi_spec_path` and
   explicit `CODECOV_TOKEN` / `N8N_WEBHOOK_SECRET` secrets); Renovate keeps `cicd_version` aligned with
   the tag, and `.releaserc.json` drives semantic-release.
-- The test stacks pin `database` / `liquibase-migrations` 2.0.0, `core-api` 2.0.0 and `bff-user` 0.5.0.
-  Core API ≥ 1.1.1 panics on `/user/me` for users without a role, so `init-test.sql` gives user 2 the
+- The test stacks pin the dev releases `database` / `liquibase-migrations` `dev-90c22bb` and `core-api`
+  `dev-95531e2` (the contract `@mairie360/core-api-openapi` `0.0.0-dev-95531e2`). Core API ≥ 1.1.1 panics on `/user/me` for users without a role, so `init-test.sql` gives user 2 the
   `User` role.
 - `tests/contracts.test.ts` mocks `globalThis.fetch` and requires `contracts/openapi.json` to exist.
 
@@ -175,6 +250,23 @@ non-401/403 answer. The spec requires `bearerAuth` at the top level (`openapi.ts
 Human-facing guides live in `docs/{en,fr}/{module,technical}.md`; `CONTRACT.md` is the BFF↔web-service
 contract summary. Keep both language versions in sync when editing docs.
 
+## Logs (MAIR-531)
+
+Logs are JSON lines on stdout, through `logger` (`src/logger.ts`, `createLogger({ target: 'bff-settings' })` of
+`@mairie360/bffs-lib` >= 2.1.0); **no `console.*` in `src/`**. `src/app.ts` mounts `requestLogger({ logger })` first
+(one `request completed` line per request: `request_id`, `method`, matched route, `status`, `duration_ms`; `X-Request-Id`
+answered) and passes the same `logger` to `errorHandler` and `checkApis`. Another line takes `request_id: requestId(req)`
+and scalar fields only; an error goes through `describeError(error)`, never as is (MAIR-290). Tests read the lines with
+`captureLogs()` (`tests/support/logs.ts`), which also silences them.
+
 ## Pull request reviewers
 
 Every PR requests a review from the whole team, minus its author: `CarolinHugo`, `LAURETbenjamin`, `MathTek` and `Quentintnrl` (`gh pr create … --reviewer CarolinHugo,LAURETbenjamin,MathTek`). `.github/CODEOWNERS` makes GitHub request them automatically as well.
+
+## Promotion to staging and prod (MAIR-494)
+
+A push to `main` only releases dev (`cicd.yml` stops at `release-dev`). Staging and prod are manual:
+`gh workflow run promote-staging.yml -R mairie360/BFF_Settings` (main's newest commit) or `gh workflow run promote-staging.yml -R mairie360/BFF_Settings -f sha=SHA` (a given commit), then the same with `promote-prod.yml`
+(environments `Staging` / `Prod`). Staging refuses a commit without `dev-<sha>` and a green main run, and runs
+the integration (newman, MAIR-262), ZAP and k6 stacks on that image; prod refuses one without `staging-<sha>` and tags the version semantic-release computes
+for that commit. `cicd.yml`, `promote-staging.yml` and `promote-prod.yml` pin the same mairie360/CICD release.

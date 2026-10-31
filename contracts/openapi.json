@@ -117,7 +117,15 @@
               "string",
               "null"
             ],
-            "example": "0612345678"
+            "example": "+33612345678"
+          },
+          "phone_country": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "ISO 3166-1 alpha-2 country of the phone",
+            "example": "FR"
           }
         },
         "required": [
@@ -154,8 +162,17 @@
               "string",
               "null"
             ],
-            "pattern": "^\\d(?:[\\s.-]?\\d){9,14}$",
-            "example": "0612345678"
+            "maxLength": 32,
+            "pattern": "^(?:\\+?[\\d\\s.()-]+)?$",
+            "example": "06 12 34 56 78"
+          },
+          "phone_country": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Z]{2}$",
+            "example": "FR"
           },
           "current_password": {
             "type": "string",
@@ -658,7 +675,25 @@
             }
           },
           "401": {
-            "description": "Invalid session",
+            "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -678,7 +713,7 @@
             }
           },
           "503": {
-            "description": "Core is not configured",
+            "description": "Core or JWT_SECRET is not configured",
             "content": {
               "application/json": {
                 "schema": {
@@ -724,7 +759,7 @@
             }
           },
           "401": {
-            "description": "Invalid session",
+            "description": "Missing, forged or expired session token, or a session Core refuses",
             "content": {
               "application/json": {
                 "schema": {
@@ -753,6 +788,24 @@
               }
             }
           },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "502": {
             "description": "Core is unavailable, failed or answered an unexpected status",
             "content": {
@@ -764,7 +817,7 @@
             }
           },
           "503": {
-            "description": "Core is not configured",
+            "description": "Core or JWT_SECRET is not configured",
             "content": {
               "application/json": {
                 "schema": {
@@ -810,7 +863,25 @@
             }
           },
           "401": {
-            "description": "Invalid session",
+            "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -830,7 +901,7 @@
             }
           },
           "503": {
-            "description": "Core is not configured",
+            "description": "Core or JWT_SECRET is not configured",
             "content": {
               "application/json": {
                 "schema": {
@@ -876,7 +947,25 @@
             }
           },
           "401": {
-            "description": "Invalid session",
+            "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -896,7 +985,7 @@
             }
           },
           "503": {
-            "description": "Core is not configured",
+            "description": "Core or JWT_SECRET is not configured",
             "content": {
               "application/json": {
                 "schema": {
@@ -942,7 +1031,25 @@
             }
           },
           "401": {
-            "description": "Invalid session",
+            "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -962,7 +1069,7 @@
             }
           },
           "503": {
-            "description": "Core is not configured",
+            "description": "Core or JWT_SECRET is not configured",
             "content": {
               "application/json": {
                 "schema": {

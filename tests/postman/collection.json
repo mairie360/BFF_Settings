@@ -1,0 +1,1409 @@
+{
+  "info": {
+    "name": "BFF Settings integration tests",
+    "description": "MAIR-262: working checks (the BFF starts, resolves sessions against Core API) and the settings round trip the Settings front relies on, replayed by newman on docker-compose-integration.yml (./integration_test.sh). The seeded Admin (user 1) and agent (user 2) are impersonated with JWTs forged from the JWT_SECRET of the stack; the agent edits its profile, appearance, general and notification settings, reads them back through the bootstrap and restores the seeded values at the end so the collection is replayable.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// One fresh account per run so the collection is replayable against a persistent database.",
+          "if (!pm.environment.get('run_id')) {",
+          "    pm.environment.set('run_id', String(Date.now()));",
+          "}",
+          "if (!pm.environment.get('test_user_email')) {",
+          "    pm.environment.set('test_user_email', `newman.${pm.environment.get('run_id')}@mairie360.test`);",
+          "}",
+          "// The seeded accounts have no known password: forge their JWT exactly like mairie360_api_lib::jwt_manager",
+          "// does (HS256, claims { sub, role, exp }), signed with the JWT_SECRET of the stack, injected by",
+          "// docker-compose-integration.yml (random per run, MAIR-428). `role` is the claim the BFFs read (MAIR-529).",
+          "const cryptoJs = require('crypto-js');",
+          "const b64url = (words) => cryptoJs.enc.Base64.stringify(words).replace(/=+$/, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
+          "const signJwt = (sub, role) => {",
+          "    const header = b64url(cryptoJs.enc.Utf8.parse(JSON.stringify({ alg: 'HS256', typ: 'JWT' })));",
+          "    const payload = b64url(cryptoJs.enc.Utf8.parse(JSON.stringify({ sub: String(sub), role, exp: Math.floor(Date.now() / 1000) + 3600 })));",
+          "    return `${header}.${payload}.${b64url(cryptoJs.HmacSHA256(`${header}.${payload}`, pm.environment.get('jwt_secret')))}`;",
+          "};",
+          "pm.environment.set('jwt_admin', signJwt(pm.environment.get('admin_user_id'), 'admin'));",
+          "pm.environment.set('jwt_agent', signJwt(pm.environment.get('agent_user_id'), 'user'));"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Service",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Body says ok\", function () {",
+                  "    pm.expect(pm.response.json().status).to.eql('ok');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Core API is reachable",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/check_apis",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "check_apis"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Core API is connected\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql('OK');",
+                  "    pm.expect(body.core_api).to.eql('Connected');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "OpenAPI document",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/openapi.json",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "openapi.json"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Document lists the settings routes\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.openapi).to.be.a('string');",
+                  "    pm.expect(body.paths).to.have.property('/settings/bootstrap');",
+                  "    pm.expect(body.paths).to.have.property('/settings/profile');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Unknown route answers a JSON 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/newman/unknown-route",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "newman",
+                "unknown-route"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test(\"Body is the error envelope\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.error, 'error').to.be.an('object');",
+                  "    pm.expect(body.error.code).to.be.a('string');",
+                  "    pm.expect(body.error.message).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ],
+      "description": "The BFF is up and reaches its upstream."
+    },
+    {
+      "name": "Session resolution",
+      "item": [
+        {
+          "name": "Bootstrap without a session is rejected",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings/bootstrap",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "bootstrap"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 401\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test(\"Body is the error envelope\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.error, 'error').to.be.an('object');",
+                  "    pm.expect(body.error.code).to.be.a('string');",
+                  "    pm.expect(body.error.message).to.be.a('string');",
+                  "});",
+                  "pm.test(\"Answer is not cacheable\", function () {",
+                  "    pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Bootstrap of the seeded administrator",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_admin}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/bootstrap",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "bootstrap"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Answer is not cacheable\", function () {",
+                  "    pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store');",
+                  "});",
+                  "pm.test(\"Profile comes from Core API and every source is available\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.profile).to.be.an('object');",
+                  "    pm.expect(body.sessions).to.be.an('array');",
+                  "    pm.expect(body.sources).to.be.an('object');",
+                  "    pm.expect(body.profile.email, 'seeded Admin (liquibase keeps its own values)').to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.profile.first_name, 'seeded Admin (liquibase keeps its own values)').to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.profile.last_name, 'seeded Admin (liquibase keeps its own values)').to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.sources.sessions).to.eql('available');",
+                  "    pm.expect(body.sources.preferences).to.eql('available');",
+                  "    pm.expect(body.sources.notifications).to.eql('available');",
+                  "    pm.expect(body.appearance).to.be.an('object');",
+                  "    pm.expect(body.general).to.be.an('object');",
+                  "    pm.expect(body.notifications).to.be.an('object');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Bootstrap of the seeded agent",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/bootstrap",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "bootstrap"
+              ]
+            },
+            "description": "A user who never saved any preference gets every field null: the application defaults apply."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Profile is the seeded agent, every setting is the application default\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.profile).to.be.an('object');",
+                  "    pm.expect(body.sessions).to.be.an('array');",
+                  "    pm.expect(body.sources).to.be.an('object');",
+                  "    pm.expect(body.profile.email).to.eql('perf-tester@mairie360.fr');",
+                  "    pm.expect(body.profile.first_name).to.eql('Perf');",
+                  "    pm.expect(body.profile.last_name).to.eql('Tester');",
+                  "    pm.expect(body.profile.phone).to.be.null;",
+                  "    pm.expect(body.sources.sessions).to.eql('available');",
+                  "    pm.expect(body.sources.preferences).to.eql('available');",
+                  "    pm.expect(body.sources.notifications).to.eql('available');",
+                  "    pm.expect(body.appearance.theme, 'appearance.theme').to.be.null;",
+                  "    pm.expect(body.appearance.font_family, 'appearance.font_family').to.be.null;",
+                  "    pm.expect(body.appearance.font_size, 'appearance.font_size').to.be.null;",
+                  "    pm.expect(body.appearance.density, 'appearance.density').to.be.null;",
+                  "    pm.expect(body.general.language, 'general.language').to.be.null;",
+                  "    pm.expect(body.general.timezone, 'general.timezone').to.be.null;",
+                  "    pm.expect(body.general.date_format, 'general.date_format').to.be.null;",
+                  "    pm.expect(body.general.home_page, 'general.home_page').to.be.null;",
+                  "    pm.expect(body.general.auto_open_notifications, 'general.auto_open_notifications').to.be.null;",
+                  "    pm.expect(body.notifications.email, 'notifications.email').to.be.null;",
+                  "    pm.expect(body.notifications.push, 'notifications.push').to.be.null;",
+                  "    pm.expect(body.notifications.desktop, 'notifications.desktop').to.be.null;",
+                  "    pm.expect(body.notifications.messages, 'notifications.messages').to.be.null;",
+                  "    pm.expect(body.notifications.projects, 'notifications.projects').to.be.null;",
+                  "    pm.expect(body.notifications.calendar, 'notifications.calendar').to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ],
+      "description": "The session comes from the Bearer JWT and is resolved against Core API."
+    },
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "Edit the names and the phone",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "profile"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Newman\",\n  \"last_name\": \"Agent {{run_id}}\",\n  \"phone\": \"06 12 34 56 78\",\n  \"phone_country\": \"FR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Answer is not cacheable\", function () {",
+                  "    pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store');",
+                  "});",
+                  "pm.test(\"The re-read profile holds the names and the phone in E.164 (MAIR-480)\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.first_name).to.eql('Newman');",
+                  "    pm.expect(body.last_name).to.eql(`Agent ${pm.environment.get('run_id')}`);",
+                  "    pm.expect(body.email).to.eql('perf-tester@mairie360.fr');",
+                  "    pm.expect(body.phone).to.eql('+33612345678');",
+                  "    pm.expect(body.phone_country).to.eql('FR');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "The bootstrap shows the edited profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/bootstrap",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "bootstrap"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Profile is the edited one\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.profile.first_name).to.eql('Newman');",
+                  "    pm.expect(body.profile.last_name).to.eql(`Agent ${pm.environment.get('run_id')}`);",
+                  "    pm.expect(body.profile.phone).to.eql('+33612345678');",
+                  "    pm.expect(body.profile.phone_country).to.eql('FR');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "The whole form with the unchanged e-mail needs no password",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "profile"
+              ]
+            },
+            "description": "The settings form always sends the whole profile: an e-mail equal to the current one is not a change.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Newman\",\n  \"last_name\": \"Agent {{run_id}}\",\n  \"email\": \"Perf-Tester@mairie360.fr\",\n  \"phone\": \"+33612345678\",\n  \"phone_country\": \"FR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Profile is saved, the e-mail is untouched\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.first_name).to.eql('Newman');",
+                  "    pm.expect(body.email).to.eql('perf-tester@mairie360.fr');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Changing the e-mail with a wrong password is refused by Core",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "profile"
+              ]
+            },
+            "description": "Core API >= 2.0 (MAIR-390) only changes the address with the current password: the seeded hash matches nothing.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"newman.{{run_id}}@mairie360.test\",\n  \"current_password\": \"Newman!Wrong123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 403\", function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "pm.test(\"Body is the error envelope\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.error, 'error').to.be.an('object');",
+                  "    pm.expect(body.error.code).to.be.a('string');",
+                  "    pm.expect(body.error.message).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "The e-mail did not change",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/bootstrap",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "bootstrap"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Still the seeded address\", function () {",
+                  "    pm.expect(pm.response.json().profile.email).to.eql('perf-tester@mairie360.fr');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Restore the seeded profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "profile"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Perf\",\n  \"last_name\": \"Tester\",\n  \"phone\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Names are back, the phone is cleared\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.first_name).to.eql('Perf');",
+                  "    pm.expect(body.last_name).to.eql('Tester');",
+                  "    pm.expect(body.phone).to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ],
+      "description": "The agent edits its profile (names, phone), the bootstrap shows it, then restores the seed."
+    },
+    {
+      "name": "Appearance and general settings",
+      "item": [
+        {
+          "name": "Save the appearance",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/appearance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "appearance"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theme\": \"dark\",\n  \"font_family\": \"Marianne\",\n  \"font_size\": 18,\n  \"density\": \"compact\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Answer is not cacheable\", function () {",
+                  "    pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store');",
+                  "});",
+                  "pm.test(\"Core stored every field\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.theme).to.eql('dark');",
+                  "    pm.expect(body.font_family).to.eql('Marianne');",
+                  "    pm.expect(body.font_size).to.eql(18);",
+                  "    pm.expect(body.density).to.eql('compact');",
+                  "    pm.expect(Object.keys(body).sort()).to.eql(['density', 'font_family', 'font_size', 'theme']);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "The bootstrap shows the appearance, the general settings stay default",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/bootstrap",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "bootstrap"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Appearance is stored, general is still every default\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.sources.preferences).to.eql('available');",
+                  "    pm.expect(body.appearance).to.eql({ theme: 'dark', font_family: 'Marianne', font_size: 18, density: 'compact' });",
+                  "    pm.expect(body.general.language, 'general.language').to.be.null;",
+                  "    pm.expect(body.general.timezone, 'general.timezone').to.be.null;",
+                  "    pm.expect(body.general.date_format, 'general.date_format').to.be.null;",
+                  "    pm.expect(body.general.home_page, 'general.home_page').to.be.null;",
+                  "    pm.expect(body.general.auto_open_notifications, 'general.auto_open_notifications').to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Save the general settings",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/general",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "general"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"language\": \"fr\",\n  \"timezone\": \"Europe/Paris\",\n  \"date_format\": \"DD/MM/YYYY\",\n  \"home_page\": \"/dashboard\",\n  \"auto_open_notifications\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Core stored every field\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.eql({ language: 'fr', timezone: 'Europe/Paris', date_format: 'DD/MM/YYYY', home_page: '/dashboard', auto_open_notifications: true });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "A partial appearance patch keeps the other fields",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/appearance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "appearance"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theme\": \"light\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Only the theme changed\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.theme).to.eql('light');",
+                  "    pm.expect(body.font_family).to.eql('Marianne');",
+                  "    pm.expect(body.font_size).to.eql(18);",
+                  "    pm.expect(body.density).to.eql('compact');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "The bootstrap shows both sections",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/bootstrap",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "bootstrap"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Appearance and general settings are both stored\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.appearance).to.eql({ theme: 'light', font_family: 'Marianne', font_size: 18, density: 'compact' });",
+                  "    pm.expect(body.general).to.eql({ language: 'fr', timezone: 'Europe/Paris', date_format: 'DD/MM/YYYY', home_page: '/dashboard', auto_open_notifications: true });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "The administrator keeps its own defaults",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_admin}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/bootstrap",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "bootstrap"
+              ]
+            },
+            "description": "Preferences are stored per user by Core: the agent writes never reach the administrator."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Every setting of the administrator is still the default\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.profile.email, 'seeded Admin (liquibase keeps its own values)').to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.appearance.theme, 'appearance.theme').to.be.null;",
+                  "    pm.expect(body.appearance.font_family, 'appearance.font_family').to.be.null;",
+                  "    pm.expect(body.appearance.font_size, 'appearance.font_size').to.be.null;",
+                  "    pm.expect(body.appearance.density, 'appearance.density').to.be.null;",
+                  "    pm.expect(body.general.language, 'general.language').to.be.null;",
+                  "    pm.expect(body.general.timezone, 'general.timezone').to.be.null;",
+                  "    pm.expect(body.general.date_format, 'general.date_format').to.be.null;",
+                  "    pm.expect(body.general.home_page, 'general.home_page').to.be.null;",
+                  "    pm.expect(body.general.auto_open_notifications, 'general.auto_open_notifications').to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ],
+      "description": "Two sections of one Core preferences record: each PATCH keeps the other section and the unsent fields."
+    },
+    {
+      "name": "Notification settings",
+      "item": [
+        {
+          "name": "Save the notification settings",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "notifications"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": true,\n  \"push\": false,\n  \"desktop\": true,\n  \"messages\": true,\n  \"projects\": false,\n  \"calendar\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Answer is not cacheable\", function () {",
+                  "    pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store');",
+                  "});",
+                  "pm.test(\"Core stored every flag\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.eql({ email: true, push: false, desktop: true, messages: true, projects: false, calendar: false });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "A partial patch keeps the other flags",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "notifications"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"projects\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Only projects changed\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.projects).to.eql(true);",
+                  "    pm.expect(body.push).to.eql(false);",
+                  "    pm.expect(body.email).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "The bootstrap shows the notification settings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/bootstrap",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "bootstrap"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Notifications are stored next to the preferences\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.sources.notifications).to.eql('available');",
+                  "    pm.expect(body.notifications).to.eql({ email: true, push: false, desktop: true, messages: true, projects: true, calendar: false });",
+                  "    pm.expect(body.appearance.theme).to.eql('light');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ],
+      "description": "The agent saves its notification settings and reads them back."
+    },
+    {
+      "name": "Restore the defaults",
+      "item": [
+        {
+          "name": "Reset the appearance",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/appearance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "appearance"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theme\": null,\n  \"font_family\": null,\n  \"font_size\": null,\n  \"density\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Every appearance field is the default again\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.theme, 'theme').to.be.null;",
+                  "    pm.expect(body.font_family, 'font_family').to.be.null;",
+                  "    pm.expect(body.font_size, 'font_size').to.be.null;",
+                  "    pm.expect(body.density, 'density').to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Reset the general settings",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/general",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "general"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"language\": null,\n  \"timezone\": null,\n  \"date_format\": null,\n  \"home_page\": null,\n  \"auto_open_notifications\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Every general field is the default again\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.language, 'language').to.be.null;",
+                  "    pm.expect(body.timezone, 'timezone').to.be.null;",
+                  "    pm.expect(body.date_format, 'date_format').to.be.null;",
+                  "    pm.expect(body.home_page, 'home_page').to.be.null;",
+                  "    pm.expect(body.auto_open_notifications, 'auto_open_notifications').to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Reset the notification settings",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "notifications"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": null,\n  \"push\": null,\n  \"desktop\": null,\n  \"messages\": null,\n  \"projects\": null,\n  \"calendar\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Every flag is the default again\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.email, 'email').to.be.null;",
+                  "    pm.expect(body.push, 'push').to.be.null;",
+                  "    pm.expect(body.desktop, 'desktop').to.be.null;",
+                  "    pm.expect(body.messages, 'messages').to.be.null;",
+                  "    pm.expect(body.projects, 'projects').to.be.null;",
+                  "    pm.expect(body.calendar, 'calendar').to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "The agent is back to its seeded state",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_agent}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/bootstrap",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "bootstrap"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Seeded profile, every setting default: the collection can be replayed\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.profile).to.be.an('object');",
+                  "    pm.expect(body.sessions).to.be.an('array');",
+                  "    pm.expect(body.sources).to.be.an('object');",
+                  "    pm.expect(body.profile.email).to.eql('perf-tester@mairie360.fr');",
+                  "    pm.expect(body.profile.first_name).to.eql('Perf');",
+                  "    pm.expect(body.profile.last_name).to.eql('Tester');",
+                  "    pm.expect(body.profile.phone).to.be.null;",
+                  "    pm.expect(body.sources.sessions).to.eql('available');",
+                  "    pm.expect(body.sources.preferences).to.eql('available');",
+                  "    pm.expect(body.sources.notifications).to.eql('available');",
+                  "    pm.expect(body.appearance.theme, 'appearance.theme').to.be.null;",
+                  "    pm.expect(body.appearance.font_family, 'appearance.font_family').to.be.null;",
+                  "    pm.expect(body.appearance.font_size, 'appearance.font_size').to.be.null;",
+                  "    pm.expect(body.appearance.density, 'appearance.density').to.be.null;",
+                  "    pm.expect(body.general.language, 'general.language').to.be.null;",
+                  "    pm.expect(body.general.timezone, 'general.timezone').to.be.null;",
+                  "    pm.expect(body.general.date_format, 'general.date_format').to.be.null;",
+                  "    pm.expect(body.general.home_page, 'general.home_page').to.be.null;",
+                  "    pm.expect(body.general.auto_open_notifications, 'general.auto_open_notifications').to.be.null;",
+                  "    pm.expect(body.notifications.email, 'notifications.email').to.be.null;",
+                  "    pm.expect(body.notifications.push, 'notifications.push').to.be.null;",
+                  "    pm.expect(body.notifications.desktop, 'notifications.desktop').to.be.null;",
+                  "    pm.expect(body.notifications.messages, 'notifications.messages').to.be.null;",
+                  "    pm.expect(body.notifications.projects, 'notifications.projects').to.be.null;",
+                  "    pm.expect(body.notifications.calendar, 'notifications.calendar').to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ],
+      "description": "null resets a field to the application default: the agent is left as seeded."
+    }
+  ]
+}
