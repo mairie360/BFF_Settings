@@ -6,6 +6,7 @@ import { ContractMockServer, unreachableUrl, type MockReply } from './support/co
 import {
   PREFERENCE_SECTIONS, SESSION_42, SESSION_ANNE, bearer, coreApiUrls, meResponse, notificationSettings, patchMe, preferences, profileOf, session, sessionsResult,
 } from './support/core-fixtures';
+import { captureLogs } from './support/logs';
 import { OpenApiContract } from './support/openapi-contract';
 import { loadOrvalContract } from './support/orval-contract';
 
@@ -313,6 +314,37 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(response.status).toBe(401);
       expectBffContract('get', '/settings/bootstrap', response);
       expect(response.body).toEqual({ error: { code: 'UNAUTHORIZED', message: 'Authentication required', details: [] } });
+    });
+
+    // MAIR-290: the cause of an upstream 502 is the axios error, which holds the caller's Bearer token and the
+    // request and response bodies. Whatever the BFF writes (JSON log lines on stdout, stderr, console) about the
+    // failure describes it by its type and status, never by these values.
+    test('MAIR-290 logs an upstream failure without the token, the profile values or the upstream body', async () => {
+      const stdout = captureLogs();
+      const stderr: string[] = [];
+      jest.spyOn(process.stderr, 'write').mockImplementation(((chunk: string | Uint8Array) => {
+        stderr.push(String(chunk));
+        return true;
+      }) as typeof process.stderr.write);
+      for (const level of ['log', 'info', 'warn', 'error', 'debug'] as const) {
+        jest.spyOn(console, level).mockImplementation((...args: unknown[]) => {
+          stderr.push(args.map((arg) => (arg instanceof Error ? `${arg.stack} ${JSON.stringify(arg)}` : typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' '));
+        });
+      }
+      const patch = patchMe({ first_name: 'Jeanne', last_name: 'Marker-290', phone: '0612345678' });
+      coreApi
+        .on('get', CORE.me, { body: meResponse() })
+        .on('patch', CORE.me, coreError(500, 'Update failed for jeanne.marker290@example.org'));
+
+      const response = await withSession(request(app).patch('/settings/profile').send(patch), SESSION_42);
+
+      expect(response.status).toBe(502);
+      expectBffContract('patch', '/settings/profile', response);
+      const written = [...stdout.map((line) => JSON.stringify(line)), ...stderr].join('\n');
+      expect(written).toContain('502');
+      for (const value of [SESSION_42, 'Marker-290', '0612345678', 'jeanne.marker290@example.org']) {
+        expect(written).not.toContain(value);
+      }
     });
 
     test.each([403, 404, 409])('turns an undeclared Core %i on the profile into a 502', async (status) => {
