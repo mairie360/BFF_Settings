@@ -113,9 +113,20 @@ export interface paths {
                         "application/json": components["schemas"]["SettingsBootstrap"];
                     };
                 };
-                /** @description Invalid session */
+                /** @description Missing, forged or expired session token, or a session Core refuses */
                 401: {
                     headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
                         [name: string]: unknown;
                     };
                     content: {
@@ -131,7 +142,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core is not configured */
+                /** @description Core or JWT_SECRET is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -194,7 +205,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Invalid session */
+                /** @description Missing, forged or expired session token, or a session Core refuses */
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -221,6 +232,17 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
                 /** @description Core is unavailable, failed or answered an unexpected status */
                 502: {
                     headers: {
@@ -230,7 +252,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core is not configured */
+                /** @description Core or JWT_SECRET is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -287,9 +309,20 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Invalid session */
+                /** @description Missing, forged or expired session token, or a session Core refuses */
                 401: {
                     headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
                         [name: string]: unknown;
                     };
                     content: {
@@ -305,7 +338,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core is not configured */
+                /** @description Core or JWT_SECRET is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -362,9 +395,20 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Invalid session */
+                /** @description Missing, forged or expired session token, or a session Core refuses */
                 401: {
                     headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
                         [name: string]: unknown;
                     };
                     content: {
@@ -380,7 +424,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core is not configured */
+                /** @description Core or JWT_SECRET is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -437,9 +481,20 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Invalid session */
+                /** @description Missing, forged or expired session token, or a session Core refuses */
                 401: {
                     headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
                         [name: string]: unknown;
                     };
                     content: {
@@ -455,7 +510,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core is not configured */
+                /** @description Core or JWT_SECRET is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -499,8 +554,13 @@ export interface components {
              * @example security-admin@mairie360.fr
              */
             email: string;
-            /** @example 0612345678 */
+            /** @example +33612345678 */
             phone?: string | null;
+            /**
+             * @description ISO 3166-1 alpha-2 country of the phone
+             * @example FR
+             */
+            phone_country?: string | null;
         };
         SettingsProfilePatch: {
             /** @example Security */
@@ -512,8 +572,10 @@ export interface components {
              * @example security-admin@mairie360.fr
              */
             email?: string;
-            /** @example 0612345678 */
+            /** @example 06 12 34 56 78 */
             phone?: string | null;
+            /** @example FR */
+            phone_country?: string | null;
             /**
              * @description Current password of the account, required when `email` changes the current address
              * @example current-password

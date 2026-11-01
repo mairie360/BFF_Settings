@@ -1,5 +1,6 @@
 import { checkApis, checkApisResponseSchema, withoutSession } from '@mairie360/bffs-lib';
 import { Router } from 'express';
+import { logger } from '../logger';
 import { registry } from '../openapi-registry';
 import { coreApi } from '../clients/coreClient';
 
@@ -21,6 +22,6 @@ registry.registerPath({
   },
 });
 
-router.get('/', checkApis({ core_api: () => coreApi.health(withoutSession('CORE_API', 5_000)) }));
+router.get('/', checkApis({ core_api: () => coreApi.health(withoutSession('CORE_API', 5_000)) }, { logger }));
 
 export default router;

@@ -2,13 +2,13 @@
 #
 # The settings profile carries the agent's names, e-mail and phone, and an e-mail change takes the
 # current password. The marker's values go there, into preferences and into deliberate errors;
-# the logs of every container of docker-compose-gdpr-marker.yml (the BFF, Core API, BFF User,
+# the logs of every container of docker-compose-gdpr-marker.yml (the BFF, Core API,
 # Postgres, Redis) are then searched for them (see gdpr_marker_test.sh). A log describes an error
 # by its type and context, never by the value it received.
 version: 1
 target: http://bff-settings:4008
 wait: /health
-# The admin JWT of the stack (sub=1, the seeded Admin), the same one the ZAP scan uses.
+# The admin JWT of the run (sub=1, the seeded Admin), signed by stack_secrets.sh with its random secret.
 env: [ADMIN_JWT]
 steps:
   - name: read the settings
@@ -18,7 +18,8 @@ steps:
       method: PATCH
       path: /settings/profile
       headers: {Authorization: "Bearer {{env.ADMIN_JWT}}"}
-      json: {first_name: "{{marker.first_name}}", last_name: "{{marker.last_name}}", phone: "{{marker.phone}}"}
+      # Core API (MAIR-480) parses a national number only with its country.
+      json: {first_name: "{{marker.first_name}}", last_name: "{{marker.last_name}}", phone: "{{marker.phone}}", phone_country: FR}
   - name: change the e-mail with a wrong current password (deliberate error)
     request:
       method: PATCH
