@@ -1,31 +1,25 @@
 # Journal des releases — BFF_Settings
 
-<!-- release-journal-state {"dev": "7e8d81ea83ea12869056d683343b8f4600ef5afe", "prod": "59441d29679d67d5461cbd12e0d9efe610bc3cd1", "prod_tag": "v2.1.0", "staging": "59441d29679d67d5461cbd12e0d9efe610bc3cd1", "updated": {"dev": "2026-11-01 12:44 UTC", "prod": "2026-10-21 10:09 UTC", "staging": "2026-10-21 09:56 UTC"}} -->
+<!-- release-journal-state {"dev": "c6507aacbeb438dcdfd0f9fe7d8e8ab46ff2b8a0", "prod": "59441d29679d67d5461cbd12e0d9efe610bc3cd1", "prod_tag": "v2.1.0", "staging": "59441d29679d67d5461cbd12e0d9efe610bc3cd1", "updated": {"dev": "2026-11-02 23:00 UTC", "prod": "2026-10-21 10:09 UTC", "staging": "2026-10-21 09:56 UTC"}} -->
 > Tenu à jour par la CI (`mairie360/CICD`, action `release/release-journal`) à chaque passage en dev, staging et prod. Ne pas modifier à la main : le fichier est réécrit au passage suivant.
 
 | Environnement | Version | Commit | Mis à jour |
 | --- | --- | --- | --- |
 | prod | v2.1.0 | `59441d2` | 2026-10-21 10:09 UTC |
 | staging | — | `59441d2` | 2026-10-21 09:56 UTC |
-| dev | — | `7e8d81e` | 2026-11-01 12:44 UTC |
+| dev | — | `c6507aa` | 2026-11-02 23:00 UTC |
 
 ## Ajouté sur main depuis la dernière release prod (v2.1.0)
 
 #### Technique
-- Test de non-régression RGPD (MAIR-290) : le test `MAIR-290 logs an upstream failure without the token, the profile values or the upstream body` vérifie qu'une erreur Core API 500 relayée en 502 sur `PATCH /settings/profile` ne laisse ni le jeton, ni les noms et téléphone envoyés, ni le corps amont dans les journaux. Une étape CI `gdpr_marker` (`gdpr_marker_test.sh`, `docker-compose-gdpr-marker.yml`, `gdpr-marker.yaml`) rejoue ce parcours et cherche ces valeurs dans les journaux de chaque conteneur. (MAIR-290, [#56](https://github.com/mairie360/BFF_Settings/pull/56))
-- Workflow `gdpr-pr.yml` sur chaque pull request : il contrôle que la section « Personal data » de la description est remplie et qu'un « Yes » est accompagné de l'inventaire. Il ne touche pas au code du BFF. (MAIR-295, [#60](https://github.com/mairie360/BFF_Settings/pull/60))
-- Mise à jour de la dépendance `zod` de 4.6.5 à 4.6.7 dans `package.json`, et adaptation de `renovate.json` au nouveau workflow. (MAIR-295, [#60](https://github.com/mairie360/BFF_Settings/pull/60))
-- Node.js épinglé à 24.22.1 dans les workflows, les images Docker (digest vérifié) et la documentation. `development.Dockerfile` lance le conteneur de développement avec l'utilisateur `node` et non `root`. (sans clé Jira, [#96](https://github.com/mairie360/BFF_Settings/pull/96))
-- Tests d'intégration sur la vraie stack : `docker-compose-integration.yml`, `integration_test.sh`, collection Postman rejouée par newman et test jest de garde. Les workflows de release passent sur `mairie360/CICD` v4.5.0. (MAIR-262, [#95](https://github.com/mairie360/BFF_Settings/pull/95))
+- Tests et CI : `cicd.yml`, `gdpr-pr.yml`, `promote-staging.yml` et `promote-prod.yml` passent à mairie360/CICD v5.2.2, avec `ANTHROPIC_WORKSPACE_ID` transmis aux workflows CI et prod. Le check « GDPR checklist » est ajouté sur chaque PR, la stack de marqueur RGPD des logs et les tests d'intégration newman (`integration_test.sh`, collection Postman) sont ajoutés, sans changement de `src/`. (MAIR-771, [#102](https://github.com/mairie360/BFF_Settings/pull/102) ; MAIR-295, [#60](https://github.com/mairie360/BFF_Settings/pull/60) ; MAIR-290, [#56](https://github.com/mairie360/BFF_Settings/pull/56) ; MAIR-262, [#95](https://github.com/mairie360/BFF_Settings/pull/95))
+- Dépendances et images : Node.js épinglé à 24.22.1 (CI, Dockerfiles par digest, documentation), `zod` passe de 4.6.5 à 4.6.7, et `development.Dockerfile` s'exécute désormais en utilisateur `node`. ([#96](https://github.com/mairie360/BFF_Settings/pull/96))
 
 ## Différence dev → staging (en dev, pas encore en staging)
 
 #### Technique
-- Test de non-régression RGPD (MAIR-290) : le test `MAIR-290 logs an upstream failure without the token, the profile values or the upstream body` vérifie qu'une erreur Core API 500 relayée en 502 sur `PATCH /settings/profile` ne laisse ni le jeton, ni les noms et téléphone envoyés, ni le corps amont dans les journaux. Une étape CI `gdpr_marker` (`gdpr_marker_test.sh`, `docker-compose-gdpr-marker.yml`, `gdpr-marker.yaml`) rejoue ce parcours et cherche ces valeurs dans les journaux de chaque conteneur. (MAIR-290, [#56](https://github.com/mairie360/BFF_Settings/pull/56))
-- Workflow `gdpr-pr.yml` sur chaque pull request : il contrôle que la section « Personal data » de la description est remplie et qu'un « Yes » est accompagné de l'inventaire. Il ne touche pas au code du BFF. (MAIR-295, [#60](https://github.com/mairie360/BFF_Settings/pull/60))
-- Mise à jour de la dépendance `zod` de 4.6.5 à 4.6.7 dans `package.json`, et adaptation de `renovate.json` au nouveau workflow. (MAIR-295, [#60](https://github.com/mairie360/BFF_Settings/pull/60))
-- Node.js épinglé à 24.22.1 dans les workflows, les images Docker (digest vérifié) et la documentation. `development.Dockerfile` lance le conteneur de développement avec l'utilisateur `node` et non `root`. (sans clé Jira, [#96](https://github.com/mairie360/BFF_Settings/pull/96))
-- Tests d'intégration sur la vraie stack : `docker-compose-integration.yml`, `integration_test.sh`, collection Postman rejouée par newman et test jest de garde. Les workflows de release passent sur `mairie360/CICD` v4.5.0. (MAIR-262, [#95](https://github.com/mairie360/BFF_Settings/pull/95))
+- Tests et CI : `cicd.yml`, `gdpr-pr.yml`, `promote-staging.yml` et `promote-prod.yml` passent à mairie360/CICD v5.2.2, avec `ANTHROPIC_WORKSPACE_ID` transmis aux workflows CI et prod. Le check « GDPR checklist » est ajouté sur chaque PR, la stack de marqueur RGPD des logs et les tests d'intégration newman (`integration_test.sh`, collection Postman) sont ajoutés, sans changement de `src/`. (MAIR-771, [#102](https://github.com/mairie360/BFF_Settings/pull/102) ; MAIR-295, [#60](https://github.com/mairie360/BFF_Settings/pull/60) ; MAIR-290, [#56](https://github.com/mairie360/BFF_Settings/pull/56) ; MAIR-262, [#95](https://github.com/mairie360/BFF_Settings/pull/95))
+- Dépendances et images : Node.js épinglé à 24.22.1 (CI, Dockerfiles par digest, documentation), `zod` passe de 4.6.5 à 4.6.7, et `development.Dockerfile` s'exécute désormais en utilisateur `node`. ([#96](https://github.com/mairie360/BFF_Settings/pull/96))
 
 ## Différence staging → prod (en staging, pas encore en prod)
 
@@ -36,6 +30,7 @@ _Rien._
 <!-- release-journal-history:start -->
 | Date | Environnement | Version | Commit | Run |
 | --- | --- | --- | --- | --- |
+| 2026-11-02 23:00 UTC | dev | — | `c6507aa` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/41540030537) |
 | 2026-11-01 12:44 UTC | dev | — | `7e8d81e` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/41307570178) |
 | 2026-11-01 12:41 UTC | dev | — | `c0ac035` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/41307315971) |
 | 2026-10-23 13:10 UTC | dev | — | `612ee8d` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/39958448175) |
