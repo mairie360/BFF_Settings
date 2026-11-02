@@ -626,6 +626,26 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(coreApi.calls(CORE.me, 'get')).toHaveLength(0);
     });
 
+    // MAIR-746: Core limits the current-password checks of an e-mail change per user. Its 429 reaches the front
+    // with the Retry-After, once (the PATCH is not retried), without Core's body and without any re-read.
+    test('mair_746 relays the Core 429 of too many current-password checks with its Retry-After', async () => {
+      coreApi
+        .on('get', CORE.me, { body: meResponse() })
+        .on('patch', CORE.me, { ...coreError(429, 'Too many requests, please try again later.'), headers: { 'Retry-After': '840' } });
+
+      const response = await withSession(request(app).patch('/settings/profile').send({
+        email: 'anne.moved@mairie.test', current_password: 'Wrong-Password-1',
+      }), SESSION_42);
+
+      expect(response.status).toBe(429);
+      expect(response.headers['retry-after']).toBe('840');
+      expectBffContract('patch', '/settings/profile', response);
+      expect(response.body.error.code).toBe('TOO_MANY_REQUESTS');
+      expect(JSON.stringify(response.body)).not.toMatch(/840|attempt/i);
+      expect(coreApi.calls(CORE.me, 'patch')).toHaveLength(1);
+      expect(upstreamSequence()).toEqual([called('GET', coreApiUrls.getGetMeUrl()), called('PATCH', coreApiUrls.getPatchMeUrl())]);
+    });
+
     test('answers 502 when the saved profile cannot be re-read', async () => {
       coreApi.on('patch', CORE.me, { status: 200 }).on('get', CORE.me, coreError(500));
 
