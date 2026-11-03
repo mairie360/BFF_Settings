@@ -17,12 +17,12 @@ const upstreamErrors = {
     ...errorContent,
   },
   502: { description: 'Core is unavailable, failed or answered an unexpected status', ...errorContent },
-  503: { description: 'Core or JWT_SECRET is not configured', ...errorContent },
+  503: { description: 'Core or the session key (JWT_PUBLIC_KEY) is not configured', ...errorContent },
 };
 
 const router = Router();
 // Every /settings route needs the caller's session: 401 before any Core call without a Bearer token verified
-// with JWT_SECRET (HS256, expiry; bffs-lib requireSession, MAIR-474). Core still checks revocation.
+// with Core's public key JWT_PUBLIC_KEY (EdDSA, expiry; bffs-lib requireSession, MAIR-474, MAIR-680). Core still checks revocation.
 router.use(requireSession);
 // The examples are valid values, so a generated request (Swagger UI, ZAP) is accepted.
 export const ProfileSchema = registry.register('SettingsProfile', z.object({

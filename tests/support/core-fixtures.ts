@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import { eddsaToken } from './session-keys';
 import { getCoreAPIMairie360 } from '@mairie360/core-api-openapi/endpoints/coreAPIMairie360';
 import type {
   GetMeResponseView, GetSessionsResultView, Group, PatchMeView, SessionSchema, UserNotificationSettings, UserPreferences,
@@ -56,11 +57,15 @@ export function session(id: string, overrides: Partial<SessionSchema> = {}): Ses
 /** Corps de `GET /api/v1/sessions/` (GetSessionsResultView). */
 export const sessionsResult = (sessions: SessionSchema[]): GetSessionsResultView => ({ sessions });
 
-/** Secret of the tests (tests/support/env.ts): the BFF verifies the session tokens with it (bffs-lib requireSession). */
+/** The historical shared secret (MAIR-680): the BFF no longer gets it, so a token signed with it must be refused. */
 export const JWT_SECRET = 'settings-contract-test-secret';
 
-/** HS256 session token of `userId` signed with `secret`, valid one hour (expired when `expiresIn` is negative). */
-export function sessionToken(userId: number | string, secret = JWT_SECRET, expiresIn = 3_600): string {
+/**
+ * Session token of `userId`, valid one hour (expired when `expiresIn` is negative): EdDSA signed like Core
+ * (MAIR-680), or HS256 signed with `secret` when one is given (a historical token).
+ */
+export function sessionToken(userId: number | string, secret?: string, expiresIn = 3_600): string {
+  if (secret === undefined) return eddsaToken(userId, { expiresIn });
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
   const payload = Buffer.from(JSON.stringify({ sub: String(userId), exp: Math.floor(Date.now() / 1000) + expiresIn })).toString('base64url');
   return `${header}.${payload}.${createHmac('sha256', secret).update(`${header}.${payload}`).digest('base64url')}`;

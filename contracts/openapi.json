@@ -713,7 +713,7 @@
             }
           },
           "503": {
-            "description": "Core or JWT_SECRET is not configured",
+            "description": "Core or the session key (JWT_PUBLIC_KEY) is not configured",
             "content": {
               "application/json": {
                 "schema": {
@@ -817,7 +817,7 @@
             }
           },
           "503": {
-            "description": "Core or JWT_SECRET is not configured",
+            "description": "Core or the session key (JWT_PUBLIC_KEY) is not configured",
             "content": {
               "application/json": {
                 "schema": {
@@ -901,7 +901,7 @@
             }
           },
           "503": {
-            "description": "Core or JWT_SECRET is not configured",
+            "description": "Core or the session key (JWT_PUBLIC_KEY) is not configured",
             "content": {
               "application/json": {
                 "schema": {
@@ -985,7 +985,7 @@
             }
           },
           "503": {
-            "description": "Core or JWT_SECRET is not configured",
+            "description": "Core or the session key (JWT_PUBLIC_KEY) is not configured",
             "content": {
               "application/json": {
                 "schema": {
@@ -1069,7 +1069,7 @@
             }
           },
           "503": {
-            "description": "Core or JWT_SECRET is not configured",
+            "description": "Core or the session key (JWT_PUBLIC_KEY) is not configured",
             "content": {
               "application/json": {
                 "schema": {

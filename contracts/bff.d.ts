@@ -142,7 +142,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core or JWT_SECRET is not configured */
+                /** @description Core or the session key (JWT_PUBLIC_KEY) is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -252,7 +252,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core or JWT_SECRET is not configured */
+                /** @description Core or the session key (JWT_PUBLIC_KEY) is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -338,7 +338,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core or JWT_SECRET is not configured */
+                /** @description Core or the session key (JWT_PUBLIC_KEY) is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -424,7 +424,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core or JWT_SECRET is not configured */
+                /** @description Core or the session key (JWT_PUBLIC_KEY) is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -510,7 +510,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Core or JWT_SECRET is not configured */
+                /** @description Core or the session key (JWT_PUBLIC_KEY) is not configured */
                 503: {
                     headers: {
                         [name: string]: unknown;
