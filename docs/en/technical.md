@@ -56,7 +56,7 @@ Values below are local examples or explicitly described behavior, not production
 | `PORT` | 4008 | Port used by this local example. |
 | `CORE_API_URL` | http://localhost:3000 | Required. Core base address (scheme optional, `http` by default), without a route suffix; read on every call, 503 when missing or invalid. |
 | `CORE_API_PORT` | — | Optional port when absent from the URL. |
-| `JWT_PUBLIC_KEY` | — | Required (MAIR-680): Core's Ed25519 public key (PEM, `\n`-escaped line breaks accepted), with which the session tokens Core signs are verified; a blank value counts as missing and the process refuses to start. |
+| `JWT_PUBLIC_KEY` | — | Required to verify Core's EdDSA tokens (MAIR-680; during the HS256 transition `JWT_SECRET` alone also lets the process start): Core's Ed25519 public key (PEM, `\n`-escaped line breaks accepted), with which the session tokens Core signs are verified; a blank value counts as missing and the process refuses to start. |
 | `JWT_SECRET` | — | HS256 transition only: the former shared secret also lets the process start and accepts HS256 tokens. Remove it once `JWT_PUBLIC_KEY` is deployed. |
 | `TRUST_PROXY` | unset (no proxy trusted) | Express `trust proxy` (`true`, a hop count or addresses/subnets), so `req.ip` is the real client behind the ingress. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | unset (telemetry off) | OpenTelemetry collector of the instance, e.g. `http://otel-collector:4318`: traces and HTTP metrics are exported over OTLP (MAIR-504). Only the method, status, parameterised route and upstream host leave the BFF, never a URL, query string, header, id or IP. |
