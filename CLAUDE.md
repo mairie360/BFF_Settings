@@ -38,12 +38,14 @@ schema — CI (`contracts:check`) and a jest test both fail otherwise. See "Cont
 **Request flow:** `src/index.ts` -> `src/app.ts` mounts three routers (`/health`, `/check_apis`,
 `/settings`). Every `/settings` request goes through the lib's `noStore` (`Cache-Control: no-store`)
 and `requireSession` (bffs-lib >= 1.2.0, MAIR-474: 401 before any Core call unless `Authorization: Bearer <token>`
-carries a token verified with `JWT_SECRET`, HS256 with `exp` and a positive `sub`; cookies and
-`x-session-token` are ignored; 503 without `JWT_SECRET`, and `start()` refuses to listen without it). Core
+carries a token verified with Core's public key `JWT_PUBLIC_KEY`, EdDSA under Core's `kid` with `iss`, `aud`, `exp`
+and a positive `sub` (MAIR-680, bffs-lib >= 2.7.0; HS256 only while `JWT_SECRET` is still set); cookies and
+`x-session-token` are ignored; 503 without a key, and `start()` runs `assertStartupConfiguration()`, which refuses a
+missing or malformed key; `tests/mair-680-eddsa-session.test.ts` pins the EdDSA / HS256 cases). Core
 still checks revocation. `tests/token-refusals.test.ts` walks `contracts/openapi.json`: every operation that
 inherits `bearerAuth` answers 401 to a missing or forged token (other scheme, garbage, other secret, expired,
 `alg: none`, swapped payload, RS256, non-numeric `sub`) without calling Core and gets past the check with a
-genuine one. Tests sign their tokens with the secret `tests/support/env.ts` sets (`sessionToken`, `bearer()`). `trust proxy` comes from `TRUST_PROXY` (lib `parseTrustProxy`).
+genuine one. Tests sign their tokens with EdDSA like Core (`sessionToken`, `bearer()`, `tests/support/session-keys.ts`); `tests/support/env.ts` sets Core's public key and removes `JWT_SECRET` (MAIR-680), so passing a secret to `sessionToken()` gives an HS256 token the default test app refuses. `trust proxy` comes from `TRUST_PROXY` (lib `parseTrustProxy`).
 
 **Errors (`@mairie360/bffs-lib`).** Every error body is `{ error: { code, message, details } }`, the
 `ErrorResponse` schema (`src/openapi-registry.ts`, the lib's `ErrorResponseSchema.clone()`). Routes throw
@@ -139,14 +141,15 @@ distroless) + the BFF image named by `IMAGE_REF` (in CI, the image published by 
 `bff-settings:local`, built by the scripts from `development.Dockerfile` when `IMAGE_REF` is empty). No
 `bff-user`: BFF_Settings never calls it.
 
-Both scripts source `stack_secrets.sh` (MAIR-474): a random `JWT_SECRET` per run, shared by core-api, the
-BFF and k6, and `ADMIN_JWT` (`sub=1`, 4 h) signed with it for the ZAP replacer; the compose files refuse to
+Both scripts source `stack_secrets.sh` (MAIR-474): a fresh Ed25519 key pair per run (MAIR-680): core-api
+holds it and signs, the BFF gets the public key only; `ADMIN_JWT` (`sub=1`, 4 h) is signed with it like Core for the
+ZAP replacer; the compose files refuse to
 start without them. They drop the volumes before and after a run, exit 1 when a dependency does not start
 (`docker compose wait` would report 0 for a test container that never ran), and `performance_test.sh` pins
 every service to the first `min(PERF_CPUS, nproc)` CPUs (4 by default, like the CI runner).
 
-- **Performance** — k6 (`load-test.js`) has one handler per operation of the contract and mints HS256
-  JWTs with the run's secret. The perf seeder also runs `init-perf.sql`, BFF_user's Core seed copied as is
+- **Performance** — k6 (`load-test.js`) has one handler per operation of the contract and reads the
+  EdDSA tokens `performance_test.sh` signs into `/tokens.json` (k6 cannot sign Ed25519, MAIR-680). The perf seeder also runs `init-perf.sql`, BFF_user's Core seed copied as is
   (10 000 agents `500001`-`510000` with five sessions each; keep it in step with BFF_user and the id ranges
   of `load-test.js`). Scenarios: `crud` runs every handler through `coverage.run()` and carries the coverage
   gate, each VU writing as its own agent (the last ten) so the handlers check what Core stored (the phone in
@@ -170,7 +173,7 @@ database + liquibase + `init-test.sql`, Redis; no fake Resend, no route of this 
 `newman` service that replays `tests/postman/collection.json` with `tests/postman/environment.json` against
 the BFF, `--bail` on the first failing request; the exit code of newman is the exit code of the script. Like
 the other stacks it tests the image named by `IMAGE_REF` (`bff-settings:local` built from
-`development.Dockerfile` when empty), sources `stack_secrets.sh` (random `JWT_SECRET` per run) and drops the
+`development.Dockerfile` when empty), sources `stack_secrets.sh` (fresh Ed25519 key pair per run, MAIR-680) and drops the
 volumes before and after. In CI it is the `integration_tests` staging gate of `promote-staging.yml`
 (mairie360/CICD `integration/bffs`) on the published `dev-<sha>` image: a failure blocks the promotion; the
 junit report (`newman-reports/newman.xml`, gitignored) is published as job summary and artifact.
@@ -188,9 +191,10 @@ The collection is split in two kinds of checks, both on the BFF's own routes:
   the unsent fields; the administrator's settings stay untouched), the notification settings, every value
   read back through the bootstrap, and `null` resetting every field so the agent ends as seeded.
 
-The seeded accounts have no known password: the collection-level pre-request script forges their JWTs
-(HS256 `{ sub, role, exp }`, like `mairie360_api_lib`) with the `jwt_secret` the compose file injects
-(`jwt_admin`, `jwt_agent`); the committed `environment.json` holds no secret or token. The settings are
+The seeded accounts have no known password and the Postman sandbox cannot sign EdDSA: `integration_test.sh` signs
+their JWTs with the run's key like Core and the compose file injects them (`jwt_admin`, `jwt_agent`, and
+`jwt_forged`, Core's `kid` with another key); the pre-request script only forges `jwt_hs256`, an HS256 Admin token.
+Both are refused in `Session resolution` and the appearance and general settings journey (MAIR-680); the committed `environment.json` holds no secret or token. The settings are
 stored by Core API per user (`/api/v1/user/me/preferences/`, `/api/v1/user/me/notifications/`), nothing in
 the BFF: the collection restores the seeded values at the end so it is replayable on the same stack, and a
 fresh `run_id` names what it writes. Isolated endpoint checks (validation errors, token refusals) stay in

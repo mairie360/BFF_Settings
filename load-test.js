@@ -1,7 +1,5 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import crypto from 'k6/crypto';
-import encoding from 'k6/encoding';
 import { createCoverage } from '/coverage.js';
 
 // ---------------------------------------------------------------------------
@@ -27,10 +25,10 @@ import { createCoverage } from '/coverage.js';
 // the load: `ci` (default) is what the 4 vCPU CI runner holds, `stress` is the high load, run by hand.
 // ---------------------------------------------------------------------------
 
-// The JWT_SECRET of the core-api / bff-settings services of the test stack: random per run, generated
-// by stack_secrets.sh (MAIR-474). No default: nothing is signed with a committed secret.
-const JWT_SECRET = __ENV.JWT_SECRET;
-if (!JWT_SECRET) throw new Error('JWT_SECRET is not set: run ./performance_test.sh, which generates it');
+// EdDSA tokens signed by performance_test.sh with this run's key, like Core signs them (MAIR-474,
+// MAIR-680): k6 cannot sign Ed25519 and nothing is signed with a committed key. The file maps every
+// seeded agent's id to its token (role `user`).
+const TOKENS = JSON.parse(open(__ENV.JWT_TOKENS_FILE || '/tokens.json'));
 // Rows of init-perf.sql: agents 500001..510000 (`perf.agent.<id>@mairie360.fr`). The reads use the first
 // 9 990, the crud VUs write as the last ten.
 const AGENTS = { first: 500001, readers: 9990, writers: 10 };
@@ -42,23 +40,16 @@ const PROFILES = {
 const PROFILE = PROFILES[__ENV.K6_PROFILE || 'ci'];
 if (!PROFILE) throw new Error(`Unknown K6_PROFILE ${__ENV.K6_PROFILE}: ${Object.keys(PROFILES).join(', ')}`);
 
-function b64url(value) {
-  return encoding.b64encode(value, 'rawurl');
-}
-
-// Minimal HS256 JWT accepted by Core API and the BFF (sub + role + exp claims).
-function mintJwt(sub, role) {
-  const header = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const now = Math.floor(Date.now() / 1000);
-  const payload = b64url(JSON.stringify({ sub, role, exp: now + 3600 }));
-  const signingInput = `${header}.${payload}`;
-  const signature = crypto.hmac('sha256', JWT_SECRET, signingInput, 'base64rawurl');
-  return `${signingInput}.${signature}`;
+// Token of seeded caller `id`, signed by performance_test.sh (fails the run on an unknown id).
+function jwtOf(id) {
+  const token = TOKENS[String(id)];
+  if (!token) throw new Error(`no token signed for user ${id}: see performance_test.sh`);
+  return token;
 }
 
 const tokens = {};
 function agent(id) {
-  if (!tokens[id]) tokens[id] = { Authorization: `Bearer ${mintJwt(String(id), 'user')}` };
+  if (!tokens[id]) tokens[id] = { Authorization: `Bearer ${jwtOf(id)}` };
   return { id, headers: tokens[id] };
 }
 const randomReader = () => agent(AGENTS.first + Math.floor(Math.random() * AGENTS.readers));
