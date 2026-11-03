@@ -17,7 +17,7 @@ const upstreamErrors = {
     ...errorContent,
   },
   502: { description: 'Core is unavailable, failed or answered an unexpected status', ...errorContent },
-  503: { description: 'Core or the session key (JWT_PUBLIC_KEY) is not configured', ...errorContent },
+  503: { description: 'Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured', ...errorContent },
 };
 
 const router = Router();

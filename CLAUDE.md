@@ -45,7 +45,7 @@ missing or malformed key; `tests/mair-680-eddsa-session.test.ts` pins the EdDSA 
 still checks revocation. `tests/token-refusals.test.ts` walks `contracts/openapi.json`: every operation that
 inherits `bearerAuth` answers 401 to a missing or forged token (other scheme, garbage, other secret, expired,
 `alg: none`, swapped payload, RS256, non-numeric `sub`) without calling Core and gets past the check with a
-genuine one. Tests sign their tokens with the secret `tests/support/env.ts` sets (`sessionToken`, `bearer()`). `trust proxy` comes from `TRUST_PROXY` (lib `parseTrustProxy`).
+genuine one. Tests sign their tokens with EdDSA like Core (`sessionToken`, `bearer()`, `tests/support/session-keys.ts`); `tests/support/env.ts` sets Core's public key and removes `JWT_SECRET` (MAIR-680), so passing a secret to `sessionToken()` gives an HS256 token the default test app refuses. `trust proxy` comes from `TRUST_PROXY` (lib `parseTrustProxy`).
 
 **Errors (`@mairie360/bffs-lib`).** Every error body is `{ error: { code, message, details } }`, the
 `ErrorResponse` schema (`src/openapi-registry.ts`, the lib's `ErrorResponseSchema.clone()`). Routes throw
