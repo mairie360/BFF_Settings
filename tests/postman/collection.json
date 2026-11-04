@@ -1533,6 +1533,349 @@
         }
       ],
       "description": "null resets a field to the application default: the agent is left as seeded."
+    },
+    {
+      "name": "MAIR-746 Current password checks are limited",
+      "item": [
+        {
+          "name": "MAIR-746 The administrator's profile before the checks",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_admin}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/bootstrap",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "bootstrap"
+              ]
+            },
+            "description": "The administrator is the Database template account: its profile is read here, then only sent back unchanged."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const profile = pm.response.json().profile;",
+                  "pm.test(\"The profile has an e-mail and names\", function () {",
+                  "    pm.expect(profile.email).to.be.a('string').and.not.empty;",
+                  "    pm.expect(profile.first_name).to.be.a('string');",
+                  "    pm.expect(profile.last_name).to.be.a('string');",
+                  "});",
+                  "pm.collectionVariables.set('mair746_email', profile.email);",
+                  "pm.collectionVariables.set('mair746_first_name', profile.first_name);",
+                  "pm.collectionVariables.set('mair746_last_name', profile.last_name);",
+                  "pm.collectionVariables.set('mair746_attempt', '0');"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "MAIR-746 Checks 1 to 5: changing the e-mail with a wrong password is refused",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_admin}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "profile"
+              ]
+            },
+            "description": "Replayed until five checks are spent (postman.setNextRequest). The seeded administrator changes nothing else in the collection, so its budget starts full.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"newman.admin.{{run_id}}@mairie360.test\",\n  \"current_password\": \"Newman!Wrong123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const attempt = Number(pm.collectionVariables.get('mair746_attempt') || 0) + 1;",
+                  "pm.collectionVariables.set('mair746_attempt', String(attempt));",
+                  "pm.test(`Check ${attempt}/5: status is 403 (wrong password, still within Core's budget)`, function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "pm.test(`Check ${attempt}/5: body is the error envelope`, function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.error.code).to.be.a('string');",
+                  "    pm.expect(body.error.message).to.be.a('string');",
+                  "});",
+                  "if (attempt < 5) {",
+                  "    pm.execution.setNextRequest(pm.info.requestName);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "MAIR-746 Check 6: Core's budget is spent, the BFF relays 429 with Retry-After",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_admin}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "profile"
+              ]
+            },
+            "description": "Core counts every current-password check of PATCH /user/me per user, right or wrong, before comparing the hash (5 per 15 minutes). The sixth is refused without being checked.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"newman.admin.{{run_id}}@mairie360.test\",\n  \"current_password\": \"Newman!Wrong123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 429\", function () {",
+                  "    pm.response.to.have.status(429);",
+                  "});",
+                  "pm.test(\"Retry-After gives the seconds left in Core's 15-minute window\", function () {",
+                  "    const retryAfter = Number(pm.response.headers.get('Retry-After'));",
+                  "    pm.expect(Number.isInteger(retryAfter), 'integer Retry-After').to.be.true;",
+                  "    pm.expect(retryAfter).to.be.within(1, 900);",
+                  "});",
+                  "pm.test(\"Body is the error envelope, without the attempt count\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.error.code).to.eql('TOO_MANY_REQUESTS');",
+                  "    pm.expect(body.error.message).to.be.a('string');",
+                  "    pm.expect(JSON.stringify(body)).not.to.match(/attempt|remaining/i);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "MAIR-746 Any other password is refused too while the budget is spent",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_admin}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "profile"
+              ]
+            },
+            "description": "Nobody knows the seeded hash's password, but the refusal comes before the check: any password gets 429, so a guess cannot be confirmed until the window ends.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"newman.admin.{{run_id}}@mairie360.test\",\n  \"current_password\": \"Another!Guess456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 429\", function () {",
+                  "    pm.response.to.have.status(429);",
+                  "});",
+                  "pm.test(\"Retry-After is still given\", function () {",
+                  "    pm.expect(Number(pm.response.headers.get('Retry-After'))).to.be.within(1, 900);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "MAIR-746 A profile change without e-mail is not limited",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_admin}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "profile"
+              ]
+            },
+            "description": "Only the e-mail change checks the password: the names (sent back unchanged) are still saved.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": {{mair746_first_name_json}},\n  \"last_name\": {{mair746_last_name_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// JSON-encoded, so any name the template account holds is sent back as is.",
+                  "pm.variables.set('mair746_first_name_json', JSON.stringify(pm.collectionVariables.get('mair746_first_name')));",
+                  "pm.variables.set('mair746_last_name_json', JSON.stringify(pm.collectionVariables.get('mair746_last_name')));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"The re-read profile is unchanged\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.first_name).to.eql(pm.collectionVariables.get('mair746_first_name'));",
+                  "    pm.expect(body.last_name).to.eql(pm.collectionVariables.get('mair746_last_name'));",
+                  "    pm.expect(body.email).to.eql(pm.collectionVariables.get('mair746_email'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "MAIR-746 The e-mail did not change",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_admin}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings/bootstrap",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "bootstrap"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Still the address read before the checks\", function () {",
+                  "    pm.expect(pm.response.json().profile.email).to.eql(pm.collectionVariables.get('mair746_email'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ],
+      "description": "The administrator guesses its current password to change its e-mail: Core refuses the sixth check within 15 minutes (MAIR-746) and the BFF relays the 429 with its Retry-After, while a change without e-mail still works. Last folder: the administrator's budget stays spent until the stack is torn down."
     }
   ]
 }

@@ -189,7 +189,14 @@ The collection is split in two kinds of checks, both on the BFF's own routes:
   an e-mail change with a wrong `current_password` refused with Core's 403, the seed restored), the
   appearance and general sections sharing one Core preferences record (a PATCH keeps the other section and
   the unsent fields; the administrator's settings stay untouched), the notification settings, every value
-  read back through the bootstrap, and `null` resetting every field so the agent ends as seeded.
+  read back through the bootstrap, and `null` resetting every field so the agent ends as seeded;
+- **MAIR-746** (last folder), as the seeded administrator (the Database template account, read first and only
+  sent back unchanged): five e-mail changes with a wrong `current_password` answer Core's 403, the sixth gets
+  Core's 429 relayed with its `Retry-After` (5 checks per user per 15 minutes, right or wrong), any other password
+  too, while a change without e-mail still saves. Core's rate limits therefore stay **on** in
+  `docker-compose-integration.yml` (no `RATE_LIMIT_ENABLED: "false"`, unlike the ZAP / k6 / GDPR-marker stacks):
+  the collection signs nobody in, so nothing else spends a budget. The administrator's budget stays spent until
+  the stack is torn down, so this folder stays last.
 
 The seeded accounts have no known password and the Postman sandbox cannot sign EdDSA: `integration_test.sh` signs
 their JWTs with the run's key like Core and the compose file injects them (`jwt_admin`, `jwt_agent`, and
@@ -244,8 +251,8 @@ non-401/403 answer. The spec requires `bearerAuth` at the top level (`openapi.ts
 - `cicd.yml` calls the shared `mairie360/CICD` `BFFs-cicd.yml@v5.2.2` (with `openapi_spec_path` and
   explicit `CODECOV_TOKEN` / `N8N_WEBHOOK_SECRET` secrets); Renovate keeps `cicd_version` aligned with
   the tag, and `.releaserc.json` drives semantic-release.
-- The test stacks pin the dev releases `database` / `liquibase-migrations` `dev-90c22bb` and `core-api`
-  `dev-95531e2` (the contract `@mairie360/core-api-openapi` `0.0.0-dev-95531e2`). Core API ≥ 1.1.1 panics on `/user/me` for users without a role, so `init-test.sql` gives user 2 the
+- The test stacks pin `core-api` `dev-3b40c2a` (Core's MAIR-746 limiter; the contract package is
+  `@mairie360/core-api-openapi` `2.2.0`). Core API ≥ 1.1.1 panics on `/user/me` for users without a role, so `init-test.sql` gives user 2 the
   `User` role.
 - `tests/contracts.test.ts` mocks `globalThis.fetch` and requires `contracts/openapi.json` to exist.
 
