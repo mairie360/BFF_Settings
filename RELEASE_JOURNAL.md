@@ -1,51 +1,54 @@
 # Journal des releases — BFF_Settings
 
-<!-- release-journal-state {"dev": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "prod": "59441d29679d67d5461cbd12e0d9efe610bc3cd1", "prod_tag": "v2.1.0", "staging": "59441d29679d67d5461cbd12e0d9efe610bc3cd1", "updated": {"dev": "2026-11-05 03:48 UTC", "prod": "2026-10-21 10:09 UTC", "staging": "2026-10-21 09:56 UTC"}} -->
+<!-- release-journal-state {"dev": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "prod": "59441d29679d67d5461cbd12e0d9efe610bc3cd1", "prod_tag": "v2.1.0", "staging": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "updated": {"dev": "2026-11-05 03:48 UTC", "prod": "2026-10-21 10:09 UTC", "staging": "2026-11-12 18:58 UTC"}} -->
 > Tenu à jour par la CI (`mairie360/CICD`, action `release/release-journal`) à chaque passage en dev, staging et prod. Ne pas modifier à la main : le fichier est réécrit au passage suivant.
 
 | Environnement | Version | Commit | Mis à jour |
 | --- | --- | --- | --- |
 | prod | v2.1.0 | `59441d2` | 2026-10-21 10:09 UTC |
-| staging | — | `59441d2` | 2026-10-21 09:56 UTC |
+| staging | — | `46af114` | 2026-11-12 18:58 UTC |
 | dev | — | `46af114` | 2026-11-05 03:48 UTC |
 
 ## Ajouté sur main depuis la dernière release prod (v2.1.0)
 
-#### Changements de comportement
-
-- Les tokens de session sont désormais vérifiés avec la clé publique Ed25519 de Core (`JWT_PUBLIC_KEY`, EdDSA, `iss`/`aud`) au lieu du secret HS256 partagé. Un token HS256 est refusé (401, sans appel à Core) dès que `JWT_SECRET` n'est plus défini ; il n'est accepté que pendant la transition, tant que `JWT_SECRET` reste en place. Le démarrage échoue sans `JWT_PUBLIC_KEY` valide : les déploiements doivent fournir la clé avant cette version. (MAIR-680, [#109](https://github.com/mairie360/BFF_Settings/pull/109))
-- La réponse 503 des routes `/settings` nomme désormais la clé de session (`JWT_PUBLIC_KEY`, ou `JWT_SECRET` pendant la transition) au lieu de `JWT_SECRET` seul. Changement de description du contrat uniquement. (MAIR-680, [#109](https://github.com/mairie360/BFF_Settings/pull/109))
-
-#### Technique
-
-- Test de la relance du 429 de Core sur `PATCH /settings/profile` (Retry-After relayé, sans corps ni re-lecture) et documentation du 429 ; la collection d'intégration vérifie la limite des contrôles de mot de passe avec Core à limiteur actif. Aucun changement de code métier. (MAIR-746, [#106](https://github.com/mairie360/BFF_Settings/pull/106), [#111](https://github.com/mairie360/BFF_Settings/pull/111))
-- Tests d'intégration sur stack réelle (`docker-compose-integration.yml`, `integration_test.sh`, collection newman) et test de non-régression des logs (marqueur RGPD MAIR-290), ainsi que la simulation RGPD MAIR-497 et le contrôle RGPD des PR MAIR-295 : outillage de CI, sans effet visible. ([#95](https://github.com/mairie360/BFF_Settings/pull/95), [#56](https://github.com/mairie360/BFF_Settings/pull/56), [#60](https://github.com/mairie360/BFF_Settings/pull/60), [#108](https://github.com/mairie360/BFF_Settings/pull/108))
-- Workflows CICD montés en v5.2.2 puis v5.3.1 (contrôles RGPD, clé `ANTHROPIC_WORKSPACE_ID`) ; le Dockerfile de production et `development.Dockerfile` passent sur `node:24.22.1-alpine` épinglé par digest, et le conteneur de développement tourne en utilisateur `node`. ([#102](https://github.com/mairie360/BFF_Settings/pull/102), [#96](https://github.com/mairie360/BFF_Settings/pull/96), [#108](https://github.com/mairie360/BFF_Settings/pull/108))
-- Mises à jour de dépendances : `zod` 4.6.5 vers 4.6.7 ; images Docker et actions GitHub épinglées par digest (node, postgres, redis, curl, k6, newman, ZAP, checkout, setup-node). ([#60](https://github.com/mairie360/BFF_Settings/pull/60), [#103](https://github.com/mairie360/BFF_Settings/pull/103), [#112](https://github.com/mairie360/BFF_Settings/pull/112))
+- chore(deps): pin node.js to c86ecea (#112) ([#112](https://github.com/mairie360/BFF_Settings/pull/112))
+- feat: MAIR-497 GDPR - Usage simulation and AI review of logs and database before prod ([#108](https://github.com/mairie360/BFF_Settings/pull/108))
+- test: MAIR-746 [Audit 30/10] BFF_Settings / Core : vérification du mot de passe sans limiteur via PATCH /settings/profile (N4) (#111) ([#111](https://github.com/mairie360/BFF_Settings/pull/111))
+- fix: MAIR-680 [Audit 23/10] Toutes les APIs et BFFs : remplacer le secret JWT HS256 partagé par 12 services (A1) ([#109](https://github.com/mairie360/BFF_Settings/pull/109))
+- chore(deps): pin dependencies (#103) ([#103](https://github.com/mairie360/BFF_Settings/pull/103))
+- fix: MAIR-746 [Audit 30/10] BFF_Settings / Core : vérification du mot de passe sans limiteur via PATCH /settings/profile (N4) (#106) ([#106](https://github.com/mairie360/BFF_Settings/pull/106))
+- ci: MAIR-771 APIs, BFFs, Database : monter CICD en v5.2.2 pour activer les contrôles RGPD (#102) ([#102](https://github.com/mairie360/BFF_Settings/pull/102))
+- fix: MAIR-290 Détecter les données personnelles dans les journaux avec un test du marqueur (#56) ([#56](https://github.com/mairie360/BFF_Settings/pull/56))
+- ci: MAIR-295 Ajouter une checklist RGPD aux PR et des rappels d'échéances automatiques (#60) ([#60](https://github.com/mairie360/BFF_Settings/pull/60))
+- fix(security): patch Node.js runtime and toolchain (#96) ([#96](https://github.com/mairie360/BFF_Settings/pull/96))
+- feat: MAIR-262 Tests d'intégration - Tests de fonctionnement des APIs, tests métier des BFFs et tests de régression (#95) ([#95](https://github.com/mairie360/BFF_Settings/pull/95))
 
 ## Différence dev → staging (en dev, pas encore en staging)
 
-#### Changements de comportement
-
-- Les tokens de session sont désormais vérifiés avec la clé publique Ed25519 de Core (`JWT_PUBLIC_KEY`, EdDSA, `iss`/`aud`) au lieu du secret HS256 partagé. Un token HS256 est refusé (401, sans appel à Core) dès que `JWT_SECRET` n'est plus défini ; il n'est accepté que pendant la transition, tant que `JWT_SECRET` reste en place. Le démarrage échoue sans `JWT_PUBLIC_KEY` valide : les déploiements doivent fournir la clé avant cette version. (MAIR-680, [#109](https://github.com/mairie360/BFF_Settings/pull/109))
-- La réponse 503 des routes `/settings` nomme désormais la clé de session (`JWT_PUBLIC_KEY`, ou `JWT_SECRET` pendant la transition) au lieu de `JWT_SECRET` seul. Changement de description du contrat uniquement. (MAIR-680, [#109](https://github.com/mairie360/BFF_Settings/pull/109))
-
-#### Technique
-
-- Test de la relance du 429 de Core sur `PATCH /settings/profile` (Retry-After relayé, sans corps ni re-lecture) et documentation du 429 ; la collection d'intégration vérifie la limite des contrôles de mot de passe avec Core à limiteur actif. Aucun changement de code métier. (MAIR-746, [#106](https://github.com/mairie360/BFF_Settings/pull/106), [#111](https://github.com/mairie360/BFF_Settings/pull/111))
-- Tests d'intégration sur stack réelle (`docker-compose-integration.yml`, `integration_test.sh`, collection newman) et test de non-régression des logs (marqueur RGPD MAIR-290), ainsi que la simulation RGPD MAIR-497 et le contrôle RGPD des PR MAIR-295 : outillage de CI, sans effet visible. ([#95](https://github.com/mairie360/BFF_Settings/pull/95), [#56](https://github.com/mairie360/BFF_Settings/pull/56), [#60](https://github.com/mairie360/BFF_Settings/pull/60), [#108](https://github.com/mairie360/BFF_Settings/pull/108))
-- Workflows CICD montés en v5.2.2 puis v5.3.1 (contrôles RGPD, clé `ANTHROPIC_WORKSPACE_ID`) ; le Dockerfile de production et `development.Dockerfile` passent sur `node:24.22.1-alpine` épinglé par digest, et le conteneur de développement tourne en utilisateur `node`. ([#102](https://github.com/mairie360/BFF_Settings/pull/102), [#96](https://github.com/mairie360/BFF_Settings/pull/96), [#108](https://github.com/mairie360/BFF_Settings/pull/108))
-- Mises à jour de dépendances : `zod` 4.6.5 vers 4.6.7 ; images Docker et actions GitHub épinglées par digest (node, postgres, redis, curl, k6, newman, ZAP, checkout, setup-node). ([#60](https://github.com/mairie360/BFF_Settings/pull/60), [#103](https://github.com/mairie360/BFF_Settings/pull/103), [#112](https://github.com/mairie360/BFF_Settings/pull/112))
+_Rien._
 
 ## Différence staging → prod (en staging, pas encore en prod)
 
-_Rien._
+- chore(deps): pin node.js to c86ecea (#112) ([#112](https://github.com/mairie360/BFF_Settings/pull/112))
+- feat: MAIR-497 GDPR - Usage simulation and AI review of logs and database before prod ([#108](https://github.com/mairie360/BFF_Settings/pull/108))
+- test: MAIR-746 [Audit 30/10] BFF_Settings / Core : vérification du mot de passe sans limiteur via PATCH /settings/profile (N4) (#111) ([#111](https://github.com/mairie360/BFF_Settings/pull/111))
+- fix: MAIR-680 [Audit 23/10] Toutes les APIs et BFFs : remplacer le secret JWT HS256 partagé par 12 services (A1) ([#109](https://github.com/mairie360/BFF_Settings/pull/109))
+- chore(deps): pin dependencies (#103) ([#103](https://github.com/mairie360/BFF_Settings/pull/103))
+- fix: MAIR-746 [Audit 30/10] BFF_Settings / Core : vérification du mot de passe sans limiteur via PATCH /settings/profile (N4) (#106) ([#106](https://github.com/mairie360/BFF_Settings/pull/106))
+- ci: MAIR-771 APIs, BFFs, Database : monter CICD en v5.2.2 pour activer les contrôles RGPD (#102) ([#102](https://github.com/mairie360/BFF_Settings/pull/102))
+- fix: MAIR-290 Détecter les données personnelles dans les journaux avec un test du marqueur (#56) ([#56](https://github.com/mairie360/BFF_Settings/pull/56))
+- ci: MAIR-295 Ajouter une checklist RGPD aux PR et des rappels d'échéances automatiques (#60) ([#60](https://github.com/mairie360/BFF_Settings/pull/60))
+- fix(security): patch Node.js runtime and toolchain (#96) ([#96](https://github.com/mairie360/BFF_Settings/pull/96))
+- feat: MAIR-262 Tests d'intégration - Tests de fonctionnement des APIs, tests métier des BFFs et tests de régression (#95) ([#95](https://github.com/mairie360/BFF_Settings/pull/95))
+
+> Résumé Claude indisponible pour ce passage : listes brutes des commits.
 
 ## Historique des passages
 
 <!-- release-journal-history:start -->
 | Date | Environnement | Version | Commit | Run |
 | --- | --- | --- | --- | --- |
+| 2026-11-12 18:58 UTC | staging | — | `46af114` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/43284325814) |
 | 2026-11-05 03:48 UTC | dev | — | `46af114` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/41963322108) |
 | 2026-11-04 18:18 UTC | dev | — | `4c98fea` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/41882714898) |
 | 2026-11-04 16:54 UTC | dev | — | `9e686f8` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/41870269863) |
