@@ -1,31 +1,34 @@
 # Journal des releases — BFF_Settings
 
-<!-- release-journal-state {"dev": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "prod": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "prod_tag": "v2.2.0", "staging": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "updated": {"dev": "2026-11-05 03:48 UTC", "prod": "2026-11-13 00:16 UTC", "staging": "2026-11-12 18:58 UTC"}} -->
+<!-- release-journal-state {"dev": "72f15c91cb6be7133eb6a0a3fb0e44f482eed45b", "prod": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "prod_tag": "v2.2.0", "staging": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "updated": {"dev": "2026-11-13 06:18 UTC", "prod": "2026-11-13 00:16 UTC", "staging": "2026-11-12 18:58 UTC"}} -->
 > Tenu à jour par la CI (`mairie360/CICD`, action `release/release-journal`) à chaque passage en dev, staging et prod. Ne pas modifier à la main : le fichier est réécrit au passage suivant.
 
 | Environnement | Version | Commit | Mis à jour |
 | --- | --- | --- | --- |
 | prod | v2.2.0 | `46af114` | 2026-11-13 00:16 UTC |
 | staging | — | `46af114` | 2026-11-12 18:58 UTC |
-| dev | — | `46af114` | 2026-11-05 03:48 UTC |
+| dev | — | `72f15c9` | 2026-11-13 06:18 UTC |
 
 ## Ajouté sur main depuis la dernière release prod (v2.2.0)
 
-_Rien._
+- chore(deps): update mairie360 database schema to v3.4.0 (#118) ([#118](https://github.com/mairie360/BFF_Settings/pull/118))
 
 ## Différence dev → staging (en dev, pas encore en staging)
 
-_Rien._
+- chore(deps): update mairie360 database schema to v3.4.0 (#118) ([#118](https://github.com/mairie360/BFF_Settings/pull/118))
 
 ## Différence staging → prod (en staging, pas encore en prod)
 
 _Rien._
+
+> Résumé Claude indisponible pour ce passage : listes brutes des commits.
 
 ## Historique des passages
 
 <!-- release-journal-history:start -->
 | Date | Environnement | Version | Commit | Run |
 | --- | --- | --- | --- | --- |
+| 2026-11-13 06:18 UTC | dev | — | `72f15c9` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/43377022790) |
 | 2026-11-13 00:16 UTC | prod | v2.2.0 | `46af114` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/43332315688) |
 | 2026-11-12 18:58 UTC | staging | — | `46af114` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/43284325814) |
 | 2026-11-05 03:48 UTC | dev | — | `46af114` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/41963322108) |
