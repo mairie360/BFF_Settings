@@ -142,7 +142,7 @@ export const BootstrapSchema = registry.register('SettingsBootstrap', z.object({
   notifications: z.union([NotificationsSchema, z.null()]),
   sources: z.object({ sessions: availability, preferences: availability, notifications: availability }),
 }));
-registry.registerPath({ method: 'get', path: '/settings/bootstrap', responses: {
+registry.registerPath({ method: 'get', path: '/settings/bootstrap', summary: 'Load the settings page of the signed-in user', responses: {
   200: { description: 'Core profile, sessions, preferences and notification settings of the signed-in user', content: { 'application/json': { schema: BootstrapSchema } } },
   ...upstreamErrors, 502: { description: 'Profile unavailable', ...errorContent },
 } });
@@ -185,7 +185,7 @@ router.get('/bootstrap', async (req, res) => {
     sources: { sessions: source(sessions), preferences: source(preferences), notifications: source(notifications) },
   }));
 });
-registry.registerPath({ method: 'patch', path: '/settings/profile', request: {
+registry.registerPath({ method: 'patch', path: '/settings/profile', summary: 'Update the profile of the signed-in user', request: {
   body: { required: true, content: { 'application/json': { schema: ProfilePatchSchema } } },
 }, responses: {
   200: { description: 'Profile saved, then read again', content: { 'application/json': { schema: ProfileSchema } } },
@@ -239,7 +239,7 @@ const sections = [
   },
 ] as const;
 for (const { section, fields, patchSchema, schema, save, answer } of sections) {
-  registry.registerPath({ method: 'patch', path: `/settings/${section}`, request: {
+  registry.registerPath({ method: 'patch', path: `/settings/${section}`, summary: `Save the ${section} settings of the signed-in user`, request: {
     body: { required: true, content: { 'application/json': { schema: patchSchema } } },
   }, responses: {
     200: { description: `${section} settings saved by Core`, content: { 'application/json': { schema } } },

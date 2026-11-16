@@ -663,6 +663,7 @@
     },
     "/settings/bootstrap": {
       "get": {
+        "summary": "Load the settings page of the signed-in user",
         "responses": {
           "200": {
             "description": "Core profile, sessions, preferences and notification settings of the signed-in user",
@@ -727,6 +728,7 @@
     },
     "/settings/profile": {
       "patch": {
+        "summary": "Update the profile of the signed-in user",
         "requestBody": {
           "required": true,
           "content": {
@@ -831,6 +833,7 @@
     },
     "/settings/appearance": {
       "patch": {
+        "summary": "Save the appearance settings of the signed-in user",
         "requestBody": {
           "required": true,
           "content": {
@@ -915,6 +918,7 @@
     },
     "/settings/general": {
       "patch": {
+        "summary": "Save the general settings of the signed-in user",
         "requestBody": {
           "required": true,
           "content": {
@@ -999,6 +1003,7 @@
     },
     "/settings/notifications": {
       "patch": {
+        "summary": "Save the notifications settings of the signed-in user",
         "requestBody": {
           "required": true,
           "content": {
