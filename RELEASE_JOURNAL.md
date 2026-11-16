@@ -1,21 +1,23 @@
 # Journal des releases — BFF_Settings
 
-<!-- release-journal-state {"dev": "9dcdbe609d16a03f3010bd44cabfdb6121e3c9e9", "prod": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "prod_tag": "v2.2.0", "staging": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "updated": {"dev": "2026-11-16 14:26 UTC", "prod": "2026-11-13 00:16 UTC", "staging": "2026-11-12 18:58 UTC"}} -->
+<!-- release-journal-state {"dev": "c0996502b205c066f3d069f8fc2db350cbcd2842", "prod": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "prod_tag": "v2.2.0", "staging": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "updated": {"dev": "2026-11-16 16:24 UTC", "prod": "2026-11-13 00:16 UTC", "staging": "2026-11-12 18:58 UTC"}} -->
 > Tenu à jour par la CI (`mairie360/CICD`, action `release/release-journal`) à chaque passage en dev, staging et prod. Ne pas modifier à la main : le fichier est réécrit au passage suivant.
 
 | Environnement | Version | Commit | Mis à jour |
 | --- | --- | --- | --- |
 | prod | v2.2.0 | `46af114` | 2026-11-13 00:16 UTC |
 | staging | — | `46af114` | 2026-11-12 18:58 UTC |
-| dev | — | `9dcdbe6` | 2026-11-16 14:26 UTC |
+| dev | — | `c099650` | 2026-11-16 16:24 UTC |
 
 ## Ajouté sur main depuis la dernière release prod (v2.2.0)
 
+- docs: MAIR-246 Update the stale CLAUDE.md files (#120) ([#120](https://github.com/mairie360/BFF_Settings/pull/120))
 - test: MAIR-241 Test the BFF_user admin routes and raise the BFFs coverage thresholds (#117) ([#117](https://github.com/mairie360/BFF_Settings/pull/117))
 - chore(deps): update mairie360 database schema to v3.4.0 (#118) ([#118](https://github.com/mairie360/BFF_Settings/pull/118))
 
 ## Différence dev → staging (en dev, pas encore en staging)
 
+- docs: MAIR-246 Update the stale CLAUDE.md files (#120) ([#120](https://github.com/mairie360/BFF_Settings/pull/120))
 - test: MAIR-241 Test the BFF_user admin routes and raise the BFFs coverage thresholds (#117) ([#117](https://github.com/mairie360/BFF_Settings/pull/117))
 - chore(deps): update mairie360 database schema to v3.4.0 (#118) ([#118](https://github.com/mairie360/BFF_Settings/pull/118))
 
@@ -30,6 +32,7 @@ _Rien._
 <!-- release-journal-history:start -->
 | Date | Environnement | Version | Commit | Run |
 | --- | --- | --- | --- | --- |
+| 2026-11-16 16:24 UTC | dev | — | `c099650` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/43905490683) |
 | 2026-11-16 14:26 UTC | dev | — | `9dcdbe6` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/43883582947) |
 | 2026-11-13 06:18 UTC | dev | — | `72f15c9` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/43377022790) |
 | 2026-11-13 00:16 UTC | prod | v2.2.0 | `46af114` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/43332315688) |
