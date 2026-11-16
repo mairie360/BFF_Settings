@@ -95,6 +95,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Load the settings page of the signed-in user */
         get: {
             parameters: {
                 query?: never;
@@ -174,6 +175,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
+        /** Update the profile of the signed-in user */
         patch: {
             parameters: {
                 query?: never;
@@ -278,6 +280,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
+        /** Save the appearance settings of the signed-in user */
         patch: {
             parameters: {
                 query?: never;
@@ -364,6 +367,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
+        /** Save the general settings of the signed-in user */
         patch: {
             parameters: {
                 query?: never;
@@ -450,6 +454,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
+        /** Save the notifications settings of the signed-in user */
         patch: {
             parameters: {
                 query?: never;
