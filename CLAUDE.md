@@ -13,7 +13,7 @@ the web service consumes. It holds no database and no local state.
 
 ```bash
 npm ci                      # install (Node.js 24.22.1 in both workflows and the Docker images)
-npm run start               # ts-node src/index.ts, listens on PORT (default 4008)
+npm run start               # tsx watch src/index.ts, listens on PORT (default 4008; deployed on 4005 by Deploiment)
 npm run build               # tsc -> dist/
 npm run lint                # eslint (flat config: eslint.config.cjs)
 npm run lint:fix
@@ -248,7 +248,7 @@ non-401/403 answer. The spec requires `bearerAuth` at the top level (`openapi.ts
   so the sync branch is an inert stub — syncing to web-service repos is not wired up here.
 - `.npmrc` points `@mairie360:*` at GitHub Packages and needs `NODE_AUTH_TOKEN`; the only `@mairie360/*`
   package is the `core-api-openapi` devDependency used by the tests (no runtime client).
-- `cicd.yml` calls the shared `mairie360/CICD` `BFFs-cicd.yml@v5.2.2` (with `openapi_spec_path` and
+- `cicd.yml` calls the shared `mairie360/CICD` `BFFs-cicd.yml@v5.3.1` (with `openapi_spec_path` and
   explicit `CODECOV_TOKEN` / `N8N_WEBHOOK_SECRET` secrets); Renovate keeps `cicd_version` aligned with
   the tag, and `.releaserc.json` drives semantic-release.
 - The test stacks pin `core-api` `dev-3b40c2a` (Core's MAIR-746 limiter; the contract package is
