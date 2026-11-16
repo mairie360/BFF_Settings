@@ -26,7 +26,7 @@ x-db-env: &db-env
 
 services:
   postgres:
-    image: ${DB_IMAGE:-ghcr.io/mairie360/database:dev-c5b8e22}
+    image: ${DB_IMAGE:-ghcr.io/mairie360/database:${UPSTREAM_TAG:-dev}}
     container_name: bff-settings-gdpr-db
     environment:
       POSTGRES_USER: postgres
@@ -46,7 +46,7 @@ services:
 
   liquibase:
     # Database >= MAIR-413 only seeds the template admin (users.id = 1) with -Dallow_template_admin=true.
-    image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:dev-c5b8e22}
+    image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:${UPSTREAM_TAG:-dev}}
     container_name: bff-settings-gdpr-liquibase
     depends_on:
       postgres:
@@ -94,7 +94,7 @@ services:
       retries: 5
 
   core:
-    image: ${CORE_API_IMAGE:-ghcr.io/mairie360/core-api:dev-3b40c2a}
+    image: ${CORE_API_IMAGE:-ghcr.io/mairie360/core-api:${UPSTREAM_TAG:-dev}}
     container_name: bff-settings-gdpr-core-api
     depends_on:
       seeder:
