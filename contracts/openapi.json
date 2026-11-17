@@ -593,6 +593,101 @@
           "notifications",
           "sources"
         ]
+      },
+      "SettingsTwoFactorStatus": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the account is protected by a second factor.",
+            "example": true
+          },
+          "backup_codes_remaining": {
+            "type": "integer",
+            "description": "Backup codes not spent yet; 0 when the second factor is off.",
+            "example": 10
+          }
+        },
+        "required": [
+          "enabled",
+          "backup_codes_remaining"
+        ]
+      },
+      "SettingsTwoFactorSetup": {
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": "string",
+            "description": "Base32 secret to type in the authenticator application.",
+            "example": "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
+          },
+          "otpauth_uri": {
+            "type": "string",
+            "description": "otpauth:// URI to render as a QR code.",
+            "example": "otpauth://totp/Mairie%20360:agent@mairie360.fr?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=Mairie%20360"
+          }
+        },
+        "required": [
+          "secret",
+          "otpauth_uri"
+        ]
+      },
+      "SettingsTwoFactorCode": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "description": "Six-digit code of the authenticator application, or a backup code.",
+            "example": "492039"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "SettingsTwoFactorDisable": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "Current password of the account.",
+            "example": "current-password"
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "description": "Six-digit code of the authenticator application, or a backup code.",
+            "example": "492039"
+          }
+        },
+        "required": [
+          "password",
+          "code"
+        ]
+      },
+      "SettingsBackupCodes": {
+        "type": "object",
+        "properties": {
+          "backup_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Ten single-use codes (`xxxx-xxxx`), shown once: they cannot be read again.",
+            "example": [
+              "k3m9-x7p2",
+              "a8d4-q1w6"
+            ]
+          }
+        },
+        "required": [
+          "backup_codes"
+        ]
       }
     },
     "parameters": {}
@@ -1065,6 +1160,424 @@
           },
           "502": {
             "description": "Core is unavailable, failed or answered an unexpected status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings/2fa": {
+      "get": {
+        "summary": "Second factor status of the signed-in user",
+        "responses": {
+          "200": {
+            "description": "Whether the second factor is on and how many backup codes are left",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsTwoFactorStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Core is unavailable, failed or answered an unexpected status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings/2fa/setup": {
+      "post": {
+        "summary": "Start the enrolment of an authenticator application",
+        "responses": {
+          "200": {
+            "description": "New secret and otpauth URI; the second factor is only on once confirmed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsTwoFactorSetup"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The second factor is already active: disable it first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Core is unavailable, failed or answered an unexpected status, including its 503 when the instance has no encryption key for the second factor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings/2fa/confirm": {
+      "post": {
+        "summary": "Confirm the enrolment with a first code",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsTwoFactorCode"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Second factor on; the ten backup codes, shown once",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsBackupCodes"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing code, or a code that does not match",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No enrolment started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Core is unavailable, failed or answered an unexpected status, including its 503 when the instance has no encryption key for the second factor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings/2fa/disable": {
+      "post": {
+        "summary": "Turn the second factor off",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsTwoFactorDisable"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Second factor removed, with its backup codes"
+          },
+          "400": {
+            "description": "Missing field, wrong password or wrong code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The second factor is not active",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Core is unavailable, failed or answered an unexpected status, including its 503 when the instance has no encryption key for the second factor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings/2fa/backup-codes": {
+      "post": {
+        "summary": "Replace the backup codes",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsTwoFactorCode"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ten new backup codes, shown once; the former ones stop working",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsBackupCodes"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing code, or a code that does not match",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The second factor is not active",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Core is unavailable, failed or answered an unexpected status, including its 503 when the instance has no encryption key for the second factor",
             "content": {
               "application/json": {
                 "schema": {
