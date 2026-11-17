@@ -9,6 +9,12 @@
       "enabled": true
     },
     {
+      "key": "coreUrl",
+      "value": "http://localhost:3000",
+      "type": "default",
+      "enabled": true
+    },
+    {
       "key": "admin_user_id",
       "value": "1",
       "type": "default",

@@ -260,4 +260,85 @@ for (const { section, fields, patchSchema, schema, save, answer } of sections) {
     return res.json(schema.parse(pick(fields, stored)));
   });
 }
+// Second factor (MAIR-805): the account routes of Core's TOTP + backup codes, relayed as they are. The secret, the
+// otpauth URI and the backup codes only travel in these answers (never logged, never cached: `noStore` above).
+const TwoFactorStatusSchema = registry.register('SettingsTwoFactorStatus', z.object({
+  enabled: z.boolean().openapi({ description: 'Whether the account is protected by a second factor.', example: true }),
+  backup_codes_remaining: z.number().int().openapi({ description: 'Backup codes not spent yet; 0 when the second factor is off.', example: 10 }),
+}));
+const TwoFactorSetupSchema = registry.register('SettingsTwoFactorSetup', z.object({
+  secret: z.string().openapi({ description: 'Base32 secret to type in the authenticator application.', example: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP' }),
+  otpauth_uri: z.string().openapi({ description: 'otpauth:// URI to render as a QR code.', example: 'otpauth://totp/Mairie%20360:agent@mairie360.fr?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=Mairie%20360' }),
+}));
+const TwoFactorCodeSchema = registry.register('SettingsTwoFactorCode', z.object({
+  code: z.string().trim().min(1).max(32).openapi({ description: 'Six-digit code of the authenticator application, or a backup code.', example: '492039' }),
+}));
+const TwoFactorDisableSchema = registry.register('SettingsTwoFactorDisable', z.object({
+  password: z.string().min(1).max(255).openapi({ description: 'Current password of the account.', example: 'current-password' }),
+  code: z.string().trim().min(1).max(32).openapi({ description: 'Six-digit code of the authenticator application, or a backup code.', example: '492039' }),
+}));
+const BackupCodesSchema = registry.register('SettingsBackupCodes', z.object({
+  backup_codes: z.array(z.string()).openapi({ description: 'Ten single-use codes (`xxxx-xxxx`), shown once: they cannot be read again.', example: ['k3m9-x7p2', 'a8d4-q1w6'] }),
+}));
+const twoFactorErrors = {
+  ...upstreamErrors,
+  502: { description: 'Core is unavailable, failed or answered an unexpected status, including its 503 when the instance has no encryption key for the second factor', ...errorContent },
+};
+registry.registerPath({ method: 'get', path: '/settings/2fa', summary: 'Second factor status of the signed-in user', responses: {
+  200: { description: 'Whether the second factor is on and how many backup codes are left', content: { 'application/json': { schema: TwoFactorStatusSchema } } },
+  ...upstreamErrors,
+} });
+router.get('/2fa', async (req, res) => {
+  const { data } = await callUpstream('CORE_API', () => coreApi.getTwoFactorStatus(asCaller('CORE_API', req)), { declared: [401], retry: true });
+  return res.json(TwoFactorStatusSchema.parse(data));
+});
+registry.registerPath({ method: 'post', path: '/settings/2fa/setup', summary: 'Start the enrolment of an authenticator application', responses: {
+  200: { description: 'New secret and otpauth URI; the second factor is only on once confirmed', content: { 'application/json': { schema: TwoFactorSetupSchema } } },
+  409: { description: 'The second factor is already active: disable it first', ...errorContent },
+  ...twoFactorErrors,
+} });
+router.post('/2fa/setup', async (req, res) => {
+  const { data } = await callUpstream('CORE_API', () => coreApi.setupTwoFactor(asCaller('CORE_API', req)), { declared: [401, 409] });
+  return res.json(TwoFactorSetupSchema.parse(data));
+});
+registry.registerPath({ method: 'post', path: '/settings/2fa/confirm', summary: 'Confirm the enrolment with a first code', request: {
+  body: { required: true, content: { 'application/json': { schema: TwoFactorCodeSchema } } },
+}, responses: {
+  200: { description: 'Second factor on; the ten backup codes, shown once', content: { 'application/json': { schema: BackupCodesSchema } } },
+  400: { description: 'Missing code, or a code that does not match', ...errorContent },
+  404: { description: 'No enrolment started', ...errorContent },
+  ...twoFactorErrors,
+} });
+router.post('/2fa/confirm', async (req, res) => {
+  const body = parseRequest(TwoFactorCodeSchema, req.body, 'body');
+  const { data } = await callUpstream('CORE_API', () => coreApi.confirmTwoFactor(body, asCaller('CORE_API', req)), { declared: [400, 401, 404] });
+  return res.json(BackupCodesSchema.parse(data));
+});
+registry.registerPath({ method: 'post', path: '/settings/2fa/disable', summary: 'Turn the second factor off', request: {
+  body: { required: true, content: { 'application/json': { schema: TwoFactorDisableSchema } } },
+}, responses: {
+  204: { description: 'Second factor removed, with its backup codes' },
+  400: { description: 'Missing field, wrong password or wrong code', ...errorContent },
+  404: { description: 'The second factor is not active', ...errorContent },
+  ...twoFactorErrors,
+} });
+router.post('/2fa/disable', async (req, res) => {
+  const body = parseRequest(TwoFactorDisableSchema, req.body, 'body');
+  await callUpstream('CORE_API', () => coreApi.disableTwoFactor(body, asCaller('CORE_API', req)), { declared: [400, 401, 404] });
+  return res.status(204).send();
+});
+registry.registerPath({ method: 'post', path: '/settings/2fa/backup-codes', summary: 'Replace the backup codes', request: {
+  body: { required: true, content: { 'application/json': { schema: TwoFactorCodeSchema } } },
+}, responses: {
+  200: { description: 'Ten new backup codes, shown once; the former ones stop working', content: { 'application/json': { schema: BackupCodesSchema } } },
+  400: { description: 'Missing code, or a code that does not match', ...errorContent },
+  404: { description: 'The second factor is not active', ...errorContent },
+  ...twoFactorErrors,
+} });
+router.post('/2fa/backup-codes', async (req, res) => {
+  const body = parseRequest(TwoFactorCodeSchema, req.body, 'body');
+  const { data } = await callUpstream('CORE_API', () => coreApi.regenerateBackupCodes(body, asCaller('CORE_API', req)), { declared: [400, 401, 404] });
+  return res.json(BackupCodesSchema.parse(data));
+});
+
 export default router;

@@ -774,6 +774,120 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
     });
   });
 
+  describe('MAIR-805 second factor routes', () => {
+    const TF = {
+      status: '/api/v1/user/me/2fa/',
+      setup: '/api/v1/user/me/2fa/setup/',
+      confirm: '/api/v1/user/me/2fa/confirm/',
+      disable: '/api/v1/user/me/2fa/disable/',
+      codes: '/api/v1/user/me/2fa/backup-codes/',
+    } as const;
+    const CODES = ['k3m9-x7p2', 'a8d4-q1w6', 'b2n5-r8t3', 'c6v1-s4y9', 'd7f3-u2h5', 'e9g8-w6j1', 'f1h4-z3k7', 'g5j2-m8l6', 'h3k9-n1p4', 'j8l7-o5q2'];
+
+    it('relays the status of the second factor', async () => {
+      coreApi.on('get', TF.status, { body: { enabled: true, backup_codes_remaining: 7 } });
+
+      const response = await withSession(request(app).get('/settings/2fa'));
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ enabled: true, backup_codes_remaining: 7 });
+      expect(response.headers['cache-control']).toBe('no-store');
+      expectBffContract('get', '/settings/2fa', response);
+    });
+
+    it('starts an enrolment and relays the secret and the otpauth URI', async () => {
+      coreApi.on('post', TF.setup, { body: { secret: 'JBSWY3DPEHPK3PXP', otpauth_uri: 'otpauth://totp/Mairie%20360:a@b.fr?secret=JBSWY3DPEHPK3PXP' } });
+
+      const response = await withSession(request(app).post('/settings/2fa/setup'));
+
+      expect(response.status).toBe(200);
+      expect(response.body.secret).toBe('JBSWY3DPEHPK3PXP');
+      expect(upstreamSequence()).toEqual([called('POST', TF.setup)]);
+      expectBffContract('post', '/settings/2fa/setup', response);
+    });
+
+    it('confirms with a code and relays the backup codes once', async () => {
+      coreApi.on('post', TF.confirm, { body: { backup_codes: CODES } });
+
+      const response = await withSession(request(app).post('/settings/2fa/confirm').send({ code: ' 492039 ' }));
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ backup_codes: CODES });
+      expect(coreApi.requests[0].body).toEqual({ code: '492039' });
+      expectBffContract('post', '/settings/2fa/confirm', response);
+    });
+
+    it('disables it with the password and a code: 204 and an empty body', async () => {
+      coreApi.on('post', TF.disable, { status: 204, raw: '', outOfContract: true });
+
+      const response = await withSession(request(app).post('/settings/2fa/disable').send({ password: 'pw', code: '492039' }));
+
+      expect(response.status).toBe(204);
+      expect(response.text).toBe('');
+      expect(coreApi.requests[0].body).toEqual({ password: 'pw', code: '492039' });
+      expectBffContract('post', '/settings/2fa/disable', response);
+    });
+
+    it('regenerates the backup codes', async () => {
+      coreApi.on('post', TF.codes, { body: { backup_codes: CODES } });
+
+      const response = await withSession(request(app).post('/settings/2fa/backup-codes').send({ code: CODES[0] }));
+
+      expect(response.status).toBe(200);
+      expect(response.body.backup_codes).toHaveLength(10);
+      expectBffContract('post', '/settings/2fa/backup-codes', response);
+    });
+
+    test.each([
+      ['post', '/settings/2fa/confirm', TF.confirm, { code: '000000' }, 400],
+      ['post', '/settings/2fa/confirm', TF.confirm, { code: '000000' }, 404],
+      ['post', '/settings/2fa/disable', TF.disable, { password: 'x', code: '000000' }, 400],
+      ['post', '/settings/2fa/disable', TF.disable, { password: 'x', code: '000000' }, 404],
+      ['post', '/settings/2fa/backup-codes', TF.codes, { code: '000000' }, 400],
+      ['post', '/settings/2fa/backup-codes', TF.codes, { code: '000000' }, 404],
+      ['post', '/settings/2fa/setup', TF.setup, undefined, 409],
+    ] as const)('%s %s keeps the Core %i', async (method, bffPath, corePath, body, status) => {
+      coreApi.on('post', corePath, coreError(status));
+
+      const response = await withSession(request(app).post(bffPath).send(body));
+
+      expect(response.status).toBe(status);
+      expect(response.body.error).toEqual(expect.objectContaining({ message: expect.any(String) }));
+      expect(JSON.stringify(response.body)).not.toContain('database');
+      expectBffContract(method, bffPath, response);
+    });
+
+    test.each([
+      ['/settings/2fa/setup', TF.setup, undefined],
+      ['/settings/2fa/confirm', TF.confirm, { code: '000000' }],
+    ])('%s answers 502 when Core has no encryption key (its 503)', async (bffPath, corePath, body) => {
+      coreApi.on('post', corePath, coreError(503, 'Two-factor authentication is not configured.'));
+
+      const response = await withSession(request(app).post(bffPath).send(body));
+
+      expect(response.status).toBe(502);
+      expect(JSON.stringify(response.body)).not.toContain('not configured.');
+      expectBffContract('post', bffPath, response);
+    });
+
+    it('relays the 429 of Core with its Retry-After', async () => {
+      coreApi.on('post', TF.confirm, { status: 429, raw: 'Too many requests', contentType: 'text/plain', headers: { 'Retry-After': '30' }, outOfContract: true });
+
+      const response = await withSession(request(app).post('/settings/2fa/confirm').send({ code: '000000' }));
+
+      expect(response.status).toBe(429);
+      expect(response.headers['retry-after']).toBe('30');
+    });
+
+    it('rejects a malformed body before any Core call', async () => {
+      const confirm = await withSession(request(app).post('/settings/2fa/confirm').send({}));
+      const disable = await withSession(request(app).post('/settings/2fa/disable').send({ code: '1' }));
+
+      expect([confirm.status, disable.status]).toEqual([400, 400]);
+      expect(coreApi.requests).toHaveLength(0);
+    });
+  });
+
   describe('GET /check_apis', () => {
     test('reports Core API connected when GET /health answers', async () => {
       coreApi.on('get', CORE.health, { raw: 'OK', contentType: 'text/plain' });
