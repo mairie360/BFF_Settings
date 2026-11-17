@@ -842,6 +842,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       ['post', '/settings/2fa/confirm', TF.confirm, { code: '000000' }, 400],
       ['post', '/settings/2fa/confirm', TF.confirm, { code: '000000' }, 404],
       ['post', '/settings/2fa/disable', TF.disable, { password: 'x', code: '000000' }, 400],
+      ['post', '/settings/2fa/disable', TF.disable, { password: 'x', code: '000000' }, 403],
       ['post', '/settings/2fa/disable', TF.disable, { password: 'x', code: '000000' }, 404],
       ['post', '/settings/2fa/backup-codes', TF.codes, { code: '000000' }, 400],
       ['post', '/settings/2fa/backup-codes', TF.codes, { code: '000000' }, 404],
