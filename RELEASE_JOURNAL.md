@@ -1,16 +1,17 @@
 # Journal des releases — BFF_Settings
 
-<!-- release-journal-state {"dev": "8d1c7839f25dae8c876b8b079166183f7170f3d2", "prod": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "prod_tag": "v2.2.0", "staging": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "updated": {"dev": "2026-11-17 23:53 UTC", "prod": "2026-11-13 00:16 UTC", "staging": "2026-11-12 18:58 UTC"}} -->
+<!-- release-journal-state {"dev": "a3d5e5fb71bd6518d3dfbb74eb34b7b16e48418f", "prod": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "prod_tag": "v2.2.0", "staging": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "updated": {"dev": "2026-11-17 23:57 UTC", "prod": "2026-11-13 00:16 UTC", "staging": "2026-11-12 18:58 UTC"}} -->
 > Tenu à jour par la CI (`mairie360/CICD`, action `release/release-journal`) à chaque passage en dev, staging et prod. Ne pas modifier à la main : le fichier est réécrit au passage suivant.
 
 | Environnement | Version | Commit | Mis à jour |
 | --- | --- | --- | --- |
 | prod | v2.2.0 | `46af114` | 2026-11-13 00:16 UTC |
 | staging | — | `46af114` | 2026-11-12 18:58 UTC |
-| dev | — | `8d1c783` | 2026-11-17 23:53 UTC |
+| dev | — | `a3d5e5f` | 2026-11-17 23:57 UTC |
 
 ## Ajouté sur main depuis la dernière release prod (v2.2.0)
 
+- feat: MAIR-810 Passkeys managed by Core ([#138](https://github.com/mairie360/BFF_Settings/pull/138))
 - feat: MAIR-808 Make the two-factor authentication mandatory (instance policy) ([#132](https://github.com/mairie360/BFF_Settings/pull/132))
 - feat: MAIR-805 Relay the second factor in BFF_Settings ([#130](https://github.com/mairie360/BFF_Settings/pull/130))
 - test: MAIR-537 Test upstream error mapping on every write route of the BFFs ([#137](https://github.com/mairie360/BFF_Settings/pull/137))
@@ -26,6 +27,7 @@
 
 ## Différence dev → staging (en dev, pas encore en staging)
 
+- feat: MAIR-810 Passkeys managed by Core ([#138](https://github.com/mairie360/BFF_Settings/pull/138))
 - feat: MAIR-808 Make the two-factor authentication mandatory (instance policy) ([#132](https://github.com/mairie360/BFF_Settings/pull/132))
 - feat: MAIR-805 Relay the second factor in BFF_Settings ([#130](https://github.com/mairie360/BFF_Settings/pull/130))
 - test: MAIR-537 Test upstream error mapping on every write route of the BFFs ([#137](https://github.com/mairie360/BFF_Settings/pull/137))
@@ -50,6 +52,7 @@ _Rien._
 <!-- release-journal-history:start -->
 | Date | Environnement | Version | Commit | Run |
 | --- | --- | --- | --- | --- |
+| 2026-11-17 23:57 UTC | dev | — | `a3d5e5f` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/44203394040) |
 | 2026-11-17 23:53 UTC | dev | — | `8d1c783` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/44202786485) |
 | 2026-11-17 23:50 UTC | dev | — | `ff75cfa` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/44202078331) |
 | 2026-11-17 17:10 UTC | dev | — | `524283b` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/44131648655) |
