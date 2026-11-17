@@ -727,6 +727,44 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(coreApi.calls(CORE.preferences, 'patch')).toHaveLength(1);
     });
 
+    // MAIR-537: general and notifications share the route loop of appearance but had no failure test.
+    test.each([
+      ['general', CORE.preferences, { language: 'fr' }, { auto_open_notifications: 'yes' }],
+      ['notifications', CORE.notifications, { email: true }, { email: 'yes' }],
+    ] as const)('MAIR-537 maps a Core failure on PATCH /settings/%s like on appearance, without retrying', async (section, template, body, invalidAnswer) => {
+      const failures: Array<[MockReply, number, string]> = [
+        [coreError(400, 'Invalid field'), 400, 'BAD_REQUEST'],
+        [coreError(401, ''), 401, 'UNAUTHORIZED'],
+        [coreError(404, 'Not Found'), 502, 'BAD_GATEWAY'],
+        [coreError(500), 502, 'BAD_GATEWAY'],
+        [{ body: invalidAnswer, outOfContract: true }, 502, 'BAD_GATEWAY'],
+      ];
+      for (const [reply, status, code] of failures) {
+        coreApi.reset();
+        coreApi.on('patch', template, reply);
+
+        const response = await withSession(request(app).patch(`/settings/${section}`).send(body));
+
+        expect({ section, status: response.status }).toEqual({ section, status });
+        expectBffContract('patch', `/settings/${section}`, response);
+        expect(response.body.error.code).toBe(code);
+        expect(JSON.stringify(response.body)).not.toMatch(/database/);
+        expect(coreApi.calls(template, 'patch')).toHaveLength(1);
+      }
+    });
+
+    test.each([
+      ['general', { language: 'fr' }],
+      ['notifications', { email: true }],
+    ] as const)('MAIR-537 PATCH /settings/%s answers 502 when Core cannot be reached', async (section, body) => {
+      await withUnreachableCore();
+
+      const response = await withSession(request(app).patch(`/settings/${section}`).send(body));
+
+      expect(response.status).toBe(502);
+      expectBffContract('patch', `/settings/${section}`, response);
+    });
+
     test.each(PREFERENCE_SECTIONS)('/settings/$section answers 401 without calling Core and no session', async ({ section }) => {
       const response = await request(app).patch(`/settings/${section}`).send({});
 
