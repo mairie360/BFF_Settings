@@ -1,16 +1,17 @@
 # Journal des releases — BFF_Settings
 
-<!-- release-journal-state {"dev": "d340e70ce97a80bdc9eabeb069b041deecac0454", "prod": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "prod_tag": "v2.2.0", "staging": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "updated": {"dev": "2026-11-16 17:58 UTC", "prod": "2026-11-13 00:16 UTC", "staging": "2026-11-12 18:58 UTC"}} -->
+<!-- release-journal-state {"dev": "0d8c9c94a597c4108c7922e7d225d8c1d73b21cb", "prod": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "prod_tag": "v2.2.0", "staging": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "updated": {"dev": "2026-11-17 11:09 UTC", "prod": "2026-11-13 00:16 UTC", "staging": "2026-11-12 18:58 UTC"}} -->
 > Tenu à jour par la CI (`mairie360/CICD`, action `release/release-journal`) à chaque passage en dev, staging et prod. Ne pas modifier à la main : le fichier est réécrit au passage suivant.
 
 | Environnement | Version | Commit | Mis à jour |
 | --- | --- | --- | --- |
 | prod | v2.2.0 | `46af114` | 2026-11-13 00:16 UTC |
 | staging | — | `46af114` | 2026-11-12 18:58 UTC |
-| dev | — | `d340e70` | 2026-11-16 17:58 UTC |
+| dev | — | `0d8c9c9` | 2026-11-17 11:09 UTC |
 
 ## Ajouté sur main depuis la dernière release prod (v2.2.0)
 
+- ci: MAIR-1008 Nightly rehearsal of the promotion gates (#125) ([#125](https://github.com/mairie360/BFF_Settings/pull/125))
 - test: MAIR-248 Translate the BFFs' messages and the ansible documentation into English (#123) ([#123](https://github.com/mairie360/BFF_Settings/pull/123))
 - fix: MAIR-248 Translate the BFFs' messages and the ansible documentation into English (#122) ([#122](https://github.com/mairie360/BFF_Settings/pull/122))
 - docs: MAIR-246 Update the stale CLAUDE.md files (#120) ([#120](https://github.com/mairie360/BFF_Settings/pull/120))
@@ -19,6 +20,7 @@
 
 ## Différence dev → staging (en dev, pas encore en staging)
 
+- ci: MAIR-1008 Nightly rehearsal of the promotion gates (#125) ([#125](https://github.com/mairie360/BFF_Settings/pull/125))
 - test: MAIR-248 Translate the BFFs' messages and the ansible documentation into English (#123) ([#123](https://github.com/mairie360/BFF_Settings/pull/123))
 - fix: MAIR-248 Translate the BFFs' messages and the ansible documentation into English (#122) ([#122](https://github.com/mairie360/BFF_Settings/pull/122))
 - docs: MAIR-246 Update the stale CLAUDE.md files (#120) ([#120](https://github.com/mairie360/BFF_Settings/pull/120))
@@ -36,6 +38,7 @@ _Rien._
 <!-- release-journal-history:start -->
 | Date | Environnement | Version | Commit | Run |
 | --- | --- | --- | --- | --- |
+| 2026-11-17 11:09 UTC | dev | — | `0d8c9c9` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/44069283801) |
 | 2026-11-16 17:58 UTC | dev | — | `d340e70` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/43922952753) |
 | 2026-11-16 16:37 UTC | dev | — | `5cc52b6` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/43908300832) |
 | 2026-11-16 16:24 UTC | dev | — | `c099650` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/43905490683) |
