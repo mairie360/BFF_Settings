@@ -319,12 +319,13 @@ registry.registerPath({ method: 'post', path: '/settings/2fa/disable', summary: 
 }, responses: {
   204: { description: 'Second factor removed, with its backup codes' },
   400: { description: 'Missing field, wrong password or wrong code', ...errorContent },
+  403: { description: 'The instance makes the second factor mandatory (MAIR-808): it cannot be turned off', ...errorContent },
   404: { description: 'The second factor is not active', ...errorContent },
   ...twoFactorErrors,
 } });
 router.post('/2fa/disable', async (req, res) => {
   const body = parseRequest(TwoFactorDisableSchema, req.body, 'body');
-  await callUpstream('CORE_API', () => coreApi.disableTwoFactor(body, asCaller('CORE_API', req)), { declared: [400, 401, 404] });
+  await callUpstream('CORE_API', () => coreApi.disableTwoFactor(body, asCaller('CORE_API', req)), { declared: [400, 401, 403, 404] });
   return res.status(204).send();
 });
 registry.registerPath({ method: 'post', path: '/settings/2fa/backup-codes', summary: 'Replace the backup codes', request: {

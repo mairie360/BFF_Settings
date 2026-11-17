@@ -1453,6 +1453,16 @@
               }
             }
           },
+          "403": {
+            "description": "The instance makes the second factor mandatory (MAIR-808): it cannot be turned off",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "The second factor is not active",
             "content": {

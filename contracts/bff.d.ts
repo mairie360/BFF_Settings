@@ -829,6 +829,15 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
+                /** @description The instance makes the second factor mandatory (MAIR-808): it cannot be turned off */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
                 /** @description The second factor is not active */
                 404: {
                     headers: {
