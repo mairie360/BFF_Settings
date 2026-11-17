@@ -22,6 +22,15 @@ const CONSUMED = [
   { operationId: 'patchMyPreferences', method: 'patch', url: coreApiUrls.getPatchMyPreferencesUrl() },
   { operationId: 'getMyNotificationSettings', method: 'get', url: coreApiUrls.getGetMyNotificationSettingsUrl() },
   { operationId: 'patchMyNotificationSettings', method: 'patch', url: coreApiUrls.getPatchMyNotificationSettingsUrl() },
+  { operationId: 'getTwoFactorStatus', method: 'get', url: coreApiUrls.getGetTwoFactorStatusUrl() },
+  { operationId: 'setupTwoFactor', method: 'post', url: coreApiUrls.getSetupTwoFactorUrl() },
+  { operationId: 'confirmTwoFactor', method: 'post', url: coreApiUrls.getConfirmTwoFactorUrl() },
+  { operationId: 'disableTwoFactor', method: 'post', url: coreApiUrls.getDisableTwoFactorUrl() },
+  { operationId: 'regenerateBackupCodes', method: 'post', url: coreApiUrls.getRegenerateBackupCodesUrl() },
+  { operationId: 'listMyPasskeys', method: 'get', url: coreApiUrls.getListMyPasskeysUrl() },
+  { operationId: 'passkeyRegisterOptions', method: 'post', url: coreApiUrls.getPasskeyRegisterOptionsUrl() },
+  { operationId: 'registerPasskey', method: 'post', url: coreApiUrls.getRegisterPasskeyUrl() },
+  { operationId: 'deleteMyPasskey', method: 'delete', url: coreApiUrls.getDeleteMyPasskeyUrl(12) },
   { operationId: 'health', method: 'get', url: coreApiUrls.getHealthUrl() },
 ] as const;
 

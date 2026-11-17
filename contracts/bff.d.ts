@@ -980,6 +980,344 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/passkeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Passkeys of the signed-in user */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The passkeys, oldest first (never the key); empty when there is none */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SettingsPasskey"][];
+                    };
+                };
+                /** @description Missing, forged or expired session token, or a session Core refuses */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core is unavailable, failed or answered an unexpected status */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Register a passkey: send the browser answer */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SettingsPasskeyRegister"];
+                };
+            };
+            responses: {
+                /** @description Passkey registered; the agent receives a security e-mail */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SettingsPasskey"];
+                    };
+                };
+                /** @description Missing or blank label, no pending registration (never started, expired, already used) or an answer that does not verify */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Missing, forged or expired session token, or a session Core refuses */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description The administrator does not accept passkeys (two-factor policy) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description This credential is already registered */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core is unavailable, failed or answered an unexpected status, including its 503 when the instance has no encryption key for the second factor */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/passkeys/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register a passkey: get the challenge */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The WebAuthn creation options; the ceremony lasts two minutes and is read once */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SettingsPasskeyRegisterOptions"];
+                    };
+                };
+                /** @description Missing, forged or expired session token, or a session Core refuses */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description The administrator does not accept passkeys (two-factor policy) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core is unavailable, failed or answered an unexpected status, including its 503 when the instance has no encryption key for the second factor */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/passkeys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete one of my passkeys */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Passkey removed; the agent receives a security e-mail */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The id is not a positive integer */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Missing, forged or expired session token, or a session Core refuses */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No such passkey among the caller's (another account's answers the same) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core is unavailable, failed or answered an unexpected status */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1197,6 +1535,67 @@ export interface components {
              *     ]
              */
             backup_codes: string[];
+        };
+        SettingsPasskey: {
+            /**
+             * @description Identifier to give to `DELETE /settings/passkeys/{id}`.
+             * @example 12
+             */
+            id: number;
+            /**
+             * @description Name the agent gave to the passkey.
+             * @example Town hall laptop
+             */
+            label: string;
+            /**
+             * @description When the passkey was registered (ISO 8601).
+             * @example 2026-11-17T09:30:00+00:00
+             */
+            created_at: string;
+            /**
+             * @description Last sign-in with this passkey (ISO 8601), `null` when never used.
+             * @example null
+             */
+            last_used_at: string | null;
+        };
+        SettingsPasskeyRegisterOptions: {
+            /**
+             * @description WebAuthn `PublicKeyCredentialCreationOptions` for `navigator.credentials.create` (user verification required, passkeys already registered excluded).
+             * @example {
+             *       "publicKey": {
+             *         "rp": {
+             *           "name": "Mairie 360",
+             *           "id": "mairie360-eip.fr"
+             *         },
+             *         "challenge": "q1w2e3r4t5y6u7i8o9p0a1s2d3f4g5h6j7k8l9z0x1c"
+             *       }
+             *     }
+             */
+            options: {
+                [key: string]: unknown;
+            };
+        };
+        SettingsPasskeyRegister: {
+            /**
+             * @description Name of the passkey, to recognise it in the list.
+             * @example Town hall laptop
+             */
+            label: string;
+            /**
+             * @description The `PublicKeyCredential` returned by `navigator.credentials.create`, in its WebAuthn JSON form. Forwarded as is: Core verifies it.
+             * @example {
+             *       "id": "k3m9x7p2",
+             *       "rawId": "k3m9x7p2",
+             *       "type": "public-key",
+             *       "response": {
+             *         "attestationObject": "o2NmbXRk",
+             *         "clientDataJSON": "eyJ0eXBl"
+             *       }
+             *     }
+             */
+            credential: {
+                [key: string]: unknown;
+            };
         };
     };
     responses: never;
