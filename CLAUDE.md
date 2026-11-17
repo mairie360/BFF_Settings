@@ -95,7 +95,11 @@ genuine one. Tests sign their tokens with EdDSA like Core (`sessionToken`, `bear
   - Second factor and passkeys (MAIR-805, MAIR-810): `/settings/2fa*` and `/settings/passkeys` relay Core's account routes
     (`GET` list, `POST /options`, `POST` register with `{ label, credential }`, `DELETE /{id}`). The passkey never leaves Core: a
     passkey is its id, label and dates. Core's 503 (no key or no WebAuthn relying party) becomes a 502 here. The sign-in with a
-    passkey is `BFF_user`'s. The k6 script has no handler for these routes yet (k6 aborts at init when a route has none).
+    passkey is `BFF_user`'s. `load-test.js` covers them (k6 aborts at init when a route has no handler): the status and the
+    passkey list are read as seeded agents; the four `/settings/2fa` writes enrol, act and turn the factor off again on one of
+    the ten writer agents, whose password is the one of `init-perf.sql` (`PerfAgent!2fa-0001`) and whose TOTP code k6 computes
+    itself; the passkey writes can only be refused (policy `403`, unknown id `404`: k6 cannot sign a WebAuthn answer). The perf
+    stack's Core gets `TOTP_ENCRYPTION_KEY` and the WebAuthn relying party.
 
 ### Telemetry (MAIR-504)
 
