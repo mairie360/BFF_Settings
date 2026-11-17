@@ -10,14 +10,15 @@
 -- load-test.js derives the same ids to read as an agent (tokens signed with the run's secret).
 --
 -- Fixed ids, ON CONFLICT DO NOTHING: the file is idempotent, like init-test.sql. The password is
--- the public argon2id hash of init-test.sql.
+-- the argon2id hash of `PerfAgent!2fa-0001` (MAIR-805: the second-factor handlers of load-test.js send it to turn the
+-- factor off); the Admin and the tester of init-test.sql keep the public template hash.
 
 INSERT INTO users (id, first_name, last_name, email, password, status)
 SELECT n,
        (ARRAY['Jean', 'Marie', 'Louis', 'Camille', 'Hugo', 'Léa', 'Paul', 'Chloé'])[1 + n % 8],
        (ARRAY['Martin', 'Bernard', 'Dubois', 'Thomas', 'Robert', 'Richard', 'Petit', 'Durand'])[1 + (n / 8) % 8] || ' ' || n,
        'perf.agent.' || n || '@mairie360.fr',
-       '$argon2id$v=19$m=19456,t=2,p=1$/iKF9PbiDRDs4EKPjlIIhg$UKx9vfwwps250mEP/bYp63CXbEnQGULeUAhDq+az9Aw',
+       '$argon2id$v=19$m=19456,t=2,p=1$FEGhwLJAeP1+8w1NLwbnSw$Pmce0qcwam3eVm7ZcDSkEV3+7RDhOZPylmHsL8JU3hs',
        'active'
 FROM generate_series(500001, 510000) AS n
 ON CONFLICT (id) DO NOTHING;

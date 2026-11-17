@@ -774,6 +774,93 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
     });
   });
 
+  describe('MAIR-810 passkey routes', () => {
+    const PK = {
+      list: '/api/v1/user/me/passkeys/',
+      options: '/api/v1/user/me/passkeys/options/',
+      register: '/api/v1/user/me/passkeys/',
+      remove: '/api/v1/user/me/passkeys/{id}/',
+    } as const;
+    const passkey = { id: 12, label: 'Town hall laptop', created_at: '2026-11-17T09:30:00+00:00', last_used_at: null };
+    const credential = { id: 'k3m9x7p2', rawId: 'k3m9x7p2', type: 'public-key', response: { attestationObject: 'o2NmbXRk', clientDataJSON: 'eyJ0eXBl' } };
+
+    it('lists the passkeys without any key material', async () => {
+      coreApi.on('get', PK.list, { body: [passkey] });
+
+      const response = await withSession(request(app).get('/settings/passkeys'));
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual([passkey]);
+      expect(response.headers['cache-control']).toBe('no-store');
+      expectBffContract('get', '/settings/passkeys', response);
+    });
+
+    it('relays the registration challenge', async () => {
+      coreApi.on('post', PK.options, { body: { options: { publicKey: { challenge: 'q1w2e3' } } } });
+
+      const response = await withSession(request(app).post('/settings/passkeys/options'));
+
+      expect(response.status).toBe(200);
+      expect(response.body.options.publicKey.challenge).toBe('q1w2e3');
+      expectBffContract('post', '/settings/passkeys/options', response);
+    });
+
+    it('registers a passkey: 201, the label trimmed, the answer forwarded as is', async () => {
+      coreApi.on('post', PK.register, { status: 201, body: passkey });
+
+      const response = await withSession(request(app).post('/settings/passkeys').send({ label: '  Town hall laptop ', credential }));
+
+      expect(response.status).toBe(201);
+      expect(response.body).toEqual(passkey);
+      expect(coreApi.requests[0].body).toEqual({ label: 'Town hall laptop', credential });
+      expectBffContract('post', '/settings/passkeys', response);
+    });
+
+    it('deletes a passkey: 204 and an empty body', async () => {
+      coreApi.on('delete', PK.remove, { status: 204, raw: '', outOfContract: true });
+
+      const response = await withSession(request(app).delete('/settings/passkeys/12'));
+
+      expect(response.status).toBe(204);
+      expect(response.text).toBe('');
+      expectBffContract('delete', '/settings/passkeys/{id}', response);
+    });
+
+    test.each([
+      ['post', '/settings/passkeys/options', PK.options, undefined, 403],
+      ['post', '/settings/passkeys', PK.register, { label: 'x', credential }, 400],
+      ['post', '/settings/passkeys', PK.register, { label: 'x', credential }, 403],
+      ['post', '/settings/passkeys', PK.register, { label: 'x', credential }, 409],
+      ['delete', '/settings/passkeys/12', PK.remove, undefined, 404],
+    ] as const)('%s %s keeps the Core %i', async (method, bffPath, corePath, body, status) => {
+      coreApi.on(method, corePath, coreError(status));
+
+      const response = await withSession(request(app)[method](bffPath).send(body));
+
+      expect(response.status).toBe(status);
+      expect(response.body.error).toEqual(expect.objectContaining({ message: expect.any(String) }));
+      expectBffContract(method, bffPath.replace('/12', '/{id}'), response);
+    });
+
+    it('answers 502 when Core has no WebAuthn configuration (its 503)', async () => {
+      coreApi.on('post', PK.options, coreError(503, 'Passkeys are not configured.'));
+
+      const response = await withSession(request(app).post('/settings/passkeys/options'));
+
+      expect(response.status).toBe(502);
+      expect(JSON.stringify(response.body)).not.toContain('not configured.');
+    });
+
+    it('rejects a blank label, a missing credential and a bad id before any Core call', async () => {
+      const blank = await withSession(request(app).post('/settings/passkeys').send({ label: '  ', credential }));
+      const noCredential = await withSession(request(app).post('/settings/passkeys').send({ label: 'x' }));
+      const badId = await withSession(request(app).delete('/settings/passkeys/abc'));
+
+      expect([blank.status, noCredential.status, badId.status]).toEqual([400, 400, 400]);
+      expect(coreApi.requests).toHaveLength(0);
+    });
+  });
+
   describe('MAIR-805 second factor routes', () => {
     const TF = {
       status: '/api/v1/user/me/2fa/',

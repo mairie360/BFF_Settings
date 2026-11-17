@@ -1,4 +1,5 @@
 import http from 'k6/http';
+import crypto from 'k6/crypto';
 import { check, sleep } from 'k6';
 import { createCoverage } from '/coverage.js';
 
@@ -86,6 +87,46 @@ function preferenceHandler(section, body) {
   });
 }
 
+// MAIR-805: second factor. RFC 6238 code of `secret` (base32) at `step`, as an authenticator application computes it.
+const BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+function totp(secret, step) {
+  let bits = '';
+  for (const ch of secret) bits += BASE32.indexOf(ch).toString(2).padStart(5, '0');
+  const key = new Uint8Array(Math.floor(bits.length / 8));
+  for (let i = 0; i < key.length; i += 1) key[i] = parseInt(bits.slice(i * 8, i * 8 + 8), 2);
+  const counter = new Uint8Array(8);
+  for (let i = 7, n = step; i >= 0; i -= 1, n = Math.floor(n / 256)) counter[i] = n % 256;
+  const mac = new Uint8Array(crypto.hmac('sha1', key.buffer, counter.buffer, 'binary'));
+  const o = mac[19] & 0x0f;
+  const n = (((mac[o] & 0x7f) << 24) | (mac[o + 1] << 16) | (mac[o + 2] << 8) | mac[o + 3]) % 1000000;
+  return String(n).padStart(6, '0');
+}
+const currentStep = () => Math.floor(Date.now() / 30000);
+
+// The seeded agents' password (init-perf.sql): turning the factor off asks for it.
+const AGENT_PASSWORD = 'PerfAgent!2fa-0001';
+
+/** A request that is not the operation under test (set-up and clean-up): untagged, it must succeed. */
+function fixture(operation, who, body) {
+  const response = http.post(coverage.url(operation), body === undefined ? null : JSON.stringify(body), {
+    headers: { ...who.headers, 'Content-Type': 'application/json' },
+  });
+  if (response.status >= 300) throw new Error(`${operation} fixture answered ${response.status}`);
+  return response;
+}
+
+/** Turns the second factor of `who` on: its secret and ten backup codes, the agent being unprotected before. */
+function enrol(who) {
+  const secret = fixture('POST /settings/2fa/setup', who).json('secret');
+  const codes = fixture('POST /settings/2fa/confirm', who, { code: totp(secret, currentStep()) }).json('backup_codes');
+  return { secret, codes };
+}
+
+/** Back to the seed: no factor, so every iteration (and every handler) starts from the same agent. */
+function unenrol(who, code) {
+  fixture('POST /settings/2fa/disable', who, { password: AGENT_PASSWORD, code });
+}
+
 const handlers = {
   // --- Connectivity (public) ---
   'GET /health': ({ request }) =>
@@ -114,6 +155,68 @@ const handlers = {
   'PATCH /settings/notifications': preferenceHandler('notifications', { email: true }),
   'PATCH /settings/appearance': preferenceHandler('appearance', { theme: 'dark' }),
   'PATCH /settings/general': preferenceHandler('general', { language: 'fr' }),
+
+  // --- Second factor (MAIR-805): the writer ends every handler unprotected again ---
+  'GET /settings/2fa': ({ request }) =>
+    check(request({ headers: randomReader().headers }), {
+      '2fa status 200': (r) => r.status === 200 && json(r)?.enabled === false && json(r)?.backup_codes_remaining === 0,
+    }),
+  'POST /settings/2fa/setup': ({ request }) =>
+    check(request({ headers: writer().headers }), {
+      '2fa setup 200': (r) => r.status === 200 && !!json(r)?.secret && `${json(r)?.otpauth_uri}`.startsWith('otpauth://'),
+    }),
+  'POST /settings/2fa/confirm': ({ request }) => {
+    const who = writer();
+    const secret = fixture('POST /settings/2fa/setup', who).json('secret');
+    const response = request({ body: { code: totp(secret, currentStep()) }, headers: who.headers });
+    check(response, {
+      '2fa confirm 200': (r) => r.status === 200 && json(r)?.backup_codes?.length === 10,
+    });
+    if (response.status === 200) unenrol(who, response.json('backup_codes')[0]);
+  },
+  'POST /settings/2fa/backup-codes': ({ request }) => {
+    const who = writer();
+    const { codes } = enrol(who);
+    const response = request({ body: { code: codes[0] }, headers: who.headers });
+    check(response, {
+      '2fa backup codes 200': (r) => r.status === 200 && json(r)?.backup_codes?.length === 10,
+    });
+    unenrol(who, response.status === 200 ? response.json('backup_codes')[0] : codes[1]);
+  },
+  'POST /settings/2fa/disable': ({ request }) => {
+    const who = writer();
+    const { codes } = enrol(who);
+    check(request({ body: { password: AGENT_PASSWORD, code: codes[0] }, headers: who.headers }), {
+      '2fa disable 204': (r) => r.status === 204,
+    });
+  },
+
+  // --- Passkeys (MAIR-810) ---
+  // Nothing here can sign a WebAuthn answer, and passkeys are refused by default (the policy of the
+  // instance): the list and the delete of an unknown id are answered as they are, the other routes
+  // answer the policy's 403 before they look at the body. The successful registration is Core's
+  // (tests/endpoints/passkeys.rs) and the jest mocks'.
+  'GET /settings/passkeys': ({ request }) =>
+    check(request({ headers: randomReader().headers }), {
+      'passkeys 200': (r) => r.status === 200 && Array.isArray(json(r)) && json(r).length === 0,
+    }),
+  'POST /settings/passkeys/options': ({ request }) =>
+    check(request({ body: {}, headers: writer().headers, params: { responseCallback: http.expectedStatuses(403) } }), {
+      'passkey options refused by the policy 403': (r) => r.status === 403,
+    }),
+  'POST /settings/passkeys': ({ request }) =>
+    check(
+      request({
+        body: { label: 'k6', credential: { id: 'AAAA', rawId: 'AAAA', type: 'public-key', response: { attestationObject: 'AAAA', clientDataJSON: 'AAAA' } } },
+        headers: writer().headers,
+        params: { responseCallback: http.expectedStatuses(403) },
+      }),
+      { 'passkey registration refused by the policy 403': (r) => r.status === 403 },
+    ),
+  'DELETE /settings/passkeys/{id}': ({ request }) =>
+    check(request({ path: { id: 999999999 }, headers: writer().headers, params: { responseCallback: http.expectedStatuses(404) } }), {
+      'unknown passkey 404': (r) => r.status === 404,
+    }),
 };
 
 const coverage = createCoverage(handlers);

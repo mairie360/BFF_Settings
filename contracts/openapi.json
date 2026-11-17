@@ -688,6 +688,93 @@
         "required": [
           "backup_codes"
         ]
+      },
+      "SettingsPasskey": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Identifier to give to `DELETE /settings/passkeys/{id}`.",
+            "example": 12
+          },
+          "label": {
+            "type": "string",
+            "description": "Name the agent gave to the passkey.",
+            "example": "Town hall laptop"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the passkey was registered (ISO 8601).",
+            "example": "2026-11-17T09:30:00+00:00"
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Last sign-in with this passkey (ISO 8601), `null` when never used.",
+            "example": null
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "created_at",
+          "last_used_at"
+        ]
+      },
+      "SettingsPasskeyRegisterOptions": {
+        "type": "object",
+        "properties": {
+          "options": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "WebAuthn `PublicKeyCredentialCreationOptions` for `navigator.credentials.create` (user verification required, passkeys already registered excluded).",
+            "example": {
+              "publicKey": {
+                "rp": {
+                  "name": "Mairie 360",
+                  "id": "mairie360-eip.fr"
+                },
+                "challenge": "q1w2e3r4t5y6u7i8o9p0a1s2d3f4g5h6j7k8l9z0x1c"
+              }
+            }
+          }
+        },
+        "required": [
+          "options"
+        ]
+      },
+      "SettingsPasskeyRegister": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[^<>]*$",
+            "description": "Name of the passkey, to recognise it in the list.",
+            "example": "Town hall laptop"
+          },
+          "credential": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "The `PublicKeyCredential` returned by `navigator.credentials.create`, in its WebAuthn JSON form. Forwarded as is: Core verifies it.",
+            "example": {
+              "id": "k3m9x7p2",
+              "rawId": "k3m9x7p2",
+              "type": "public-key",
+              "response": {
+                "attestationObject": "o2NmbXRk",
+                "clientDataJSON": "eyJ0eXBl"
+              }
+            }
+          }
+        },
+        "required": [
+          "label",
+          "credential"
+        ]
       }
     },
     "parameters": {}
@@ -1588,6 +1675,342 @@
           },
           "502": {
             "description": "Core is unavailable, failed or answered an unexpected status, including its 503 when the instance has no encryption key for the second factor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings/passkeys": {
+      "get": {
+        "summary": "Passkeys of the signed-in user",
+        "responses": {
+          "200": {
+            "description": "The passkeys, oldest first (never the key); empty when there is none",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SettingsPasskey"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Core is unavailable, failed or answered an unexpected status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Register a passkey: send the browser answer",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsPasskeyRegister"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Passkey registered; the agent receives a security e-mail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsPasskey"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or blank label, no pending registration (never started, expired, already used) or an answer that does not verify",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The administrator does not accept passkeys (two-factor policy)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This credential is already registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Core is unavailable, failed or answered an unexpected status, including its 503 when the instance has no encryption key for the second factor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings/passkeys/options": {
+      "post": {
+        "summary": "Register a passkey: get the challenge",
+        "responses": {
+          "200": {
+            "description": "The WebAuthn creation options; the ceremony lasts two minutes and is read once",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsPasskeyRegisterOptions"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The administrator does not accept passkeys (two-factor policy)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Core is unavailable, failed or answered an unexpected status, including its 503 when the instance has no encryption key for the second factor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings/passkeys/{id}": {
+      "delete": {
+        "summary": "Delete one of my passkeys",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 2147483647
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Passkey removed; the agent receives a security e-mail"
+          },
+          "400": {
+            "description": "The id is not a positive integer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such passkey among the caller's (another account's answers the same)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Core is unavailable, failed or answered an unexpected status",
             "content": {
               "application/json": {
                 "schema": {

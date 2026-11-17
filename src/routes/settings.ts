@@ -342,4 +342,69 @@ router.post('/2fa/backup-codes', async (req, res) => {
   return res.json(BackupCodesSchema.parse(data));
 });
 
+// Passkeys (MAIR-810): the account routes of Core's WebAuthn passkeys, relayed. The key itself never leaves Core: a passkey
+// is only its id, label and dates. The sign-in with a passkey is `BFF_user`'s (`POST /auth/passkey`).
+const PasskeySchema = registry.register('SettingsPasskey', z.object({
+  id: z.number().int().openapi({ description: 'Identifier to give to `DELETE /settings/passkeys/{id}`.', example: 12 }),
+  label: z.string().openapi({ description: 'Name the agent gave to the passkey.', example: 'Town hall laptop' }),
+  created_at: z.string().openapi({ description: 'When the passkey was registered (ISO 8601).', example: '2026-11-17T09:30:00+00:00' }),
+  last_used_at: z.string().nullable().openapi({ description: 'Last sign-in with this passkey (ISO 8601), `null` when never used.', example: null }),
+}));
+const PasskeyRegisterOptionsSchema = registry.register('SettingsPasskeyRegisterOptions', z.object({
+  options: z.record(z.string(), z.unknown()).openapi({
+    description: 'WebAuthn `PublicKeyCredentialCreationOptions` for `navigator.credentials.create` (user verification required, passkeys already registered excluded).',
+    example: { publicKey: { rp: { name: 'Mairie 360', id: 'mairie360-eip.fr' }, challenge: 'q1w2e3r4t5y6u7i8o9p0a1s2d3f4g5h6j7k8l9z0x1c' } },
+  }),
+}));
+const PasskeyRegisterSchema = registry.register('SettingsPasskeyRegister', z.object({
+  label: z.string().trim().min(1).max(100).regex(/^[^<>]*$/, 'Must not contain < or >').openapi({ description: 'Name of the passkey, to recognise it in the list.', example: 'Town hall laptop' }),
+  credential: z.record(z.string(), z.unknown()).openapi({
+    description: 'The `PublicKeyCredential` returned by `navigator.credentials.create`, in its WebAuthn JSON form. Forwarded as is: Core verifies it.',
+    example: { id: 'k3m9x7p2', rawId: 'k3m9x7p2', type: 'public-key', response: { attestationObject: 'o2NmbXRk', clientDataJSON: 'eyJ0eXBl' } },
+  }),
+}));
+const PasskeyIdParams = z.object({ id: z.coerce.number().int().positive().max(2147483647) });
+registry.registerPath({ method: 'get', path: '/settings/passkeys', summary: 'Passkeys of the signed-in user', responses: {
+  200: { description: 'The passkeys, oldest first (never the key); empty when there is none', content: { 'application/json': { schema: z.array(PasskeySchema) } } },
+  ...upstreamErrors,
+} });
+router.get('/passkeys', async (req, res) => {
+  const { data } = await callUpstream('CORE_API', () => coreApi.listMyPasskeys(asCaller('CORE_API', req)), { declared: [401], retry: true });
+  return res.json(z.array(PasskeySchema).parse(data));
+});
+registry.registerPath({ method: 'post', path: '/settings/passkeys/options', summary: 'Register a passkey: get the challenge', responses: {
+  200: { description: 'The WebAuthn creation options; the ceremony lasts two minutes and is read once', content: { 'application/json': { schema: PasskeyRegisterOptionsSchema } } },
+  403: { description: 'The administrator does not accept passkeys (two-factor policy)', ...errorContent },
+  ...twoFactorErrors,
+} });
+router.post('/passkeys/options', async (req, res) => {
+  const { data } = await callUpstream('CORE_API', () => coreApi.passkeyRegisterOptions(asCaller('CORE_API', req)), { declared: [401, 403] });
+  return res.json(PasskeyRegisterOptionsSchema.parse(data));
+});
+registry.registerPath({ method: 'post', path: '/settings/passkeys', summary: 'Register a passkey: send the browser answer', request: {
+  body: { required: true, content: { 'application/json': { schema: PasskeyRegisterSchema } } },
+}, responses: {
+  201: { description: 'Passkey registered; the agent receives a security e-mail', content: { 'application/json': { schema: PasskeySchema } } },
+  400: { description: 'Missing or blank label, no pending registration (never started, expired, already used) or an answer that does not verify', ...errorContent },
+  403: { description: 'The administrator does not accept passkeys (two-factor policy)', ...errorContent },
+  409: { description: 'This credential is already registered', ...errorContent },
+  ...twoFactorErrors,
+} });
+router.post('/passkeys', async (req, res) => {
+  const body = parseRequest(PasskeyRegisterSchema, req.body, 'body');
+  const { data } = await callUpstream('CORE_API', () => coreApi.registerPasskey(body as never, asCaller('CORE_API', req)), { declared: [400, 401, 403, 409] });
+  return res.status(201).json(PasskeySchema.parse(data));
+});
+registry.registerPath({ method: 'delete', path: '/settings/passkeys/{id}', summary: 'Delete one of my passkeys', request: { params: PasskeyIdParams }, responses: {
+  204: { description: 'Passkey removed; the agent receives a security e-mail' },
+  400: { description: 'The id is not a positive integer', ...errorContent },
+  404: { description: 'No such passkey among the caller\'s (another account\'s answers the same)', ...errorContent },
+  ...upstreamErrors,
+} });
+router.delete('/passkeys/:id', async (req, res) => {
+  const { id } = parseRequest(PasskeyIdParams, req.params, 'params');
+  await callUpstream('CORE_API', () => coreApi.deleteMyPasskey(id, asCaller('CORE_API', req)), { declared: [400, 401, 404] });
+  return res.status(204).send();
+});
+
 export default router;
