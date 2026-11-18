@@ -1,16 +1,17 @@
 # Journal des releases — BFF_Settings
 
-<!-- release-journal-state {"dev": "a3d5e5fb71bd6518d3dfbb74eb34b7b16e48418f", "prod": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "prod_tag": "v2.2.0", "staging": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "updated": {"dev": "2026-11-17 23:57 UTC", "prod": "2026-11-13 00:16 UTC", "staging": "2026-11-12 18:58 UTC"}} -->
+<!-- release-journal-state {"dev": "d5fc231a9d880d1b9d09e7d81d876cab5ab69eeb", "prod": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "prod_tag": "v2.2.0", "staging": "46af11466c5b96d4f42d5dd824c17a7aa74fcfc3", "updated": {"dev": "2026-11-18 01:03 UTC", "prod": "2026-11-13 00:16 UTC", "staging": "2026-11-12 18:58 UTC"}} -->
 > Tenu à jour par la CI (`mairie360/CICD`, action `release/release-journal`) à chaque passage en dev, staging et prod. Ne pas modifier à la main : le fichier est réécrit au passage suivant.
 
 | Environnement | Version | Commit | Mis à jour |
 | --- | --- | --- | --- |
 | prod | v2.2.0 | `46af114` | 2026-11-13 00:16 UTC |
 | staging | — | `46af114` | 2026-11-12 18:58 UTC |
-| dev | — | `a3d5e5f` | 2026-11-17 23:57 UTC |
+| dev | — | `d5fc231` | 2026-11-18 01:03 UTC |
 
 ## Ajouté sur main depuis la dernière release prod (v2.2.0)
 
+- fix: MAIR-682 [Audit 23/10] All BFFs: graceful shutdown on SIGTERM (B7) (#140) ([#140](https://github.com/mairie360/BFF_Settings/pull/140))
 - feat: MAIR-810 Passkeys managed by Core ([#138](https://github.com/mairie360/BFF_Settings/pull/138))
 - feat: MAIR-808 Make the two-factor authentication mandatory (instance policy) ([#132](https://github.com/mairie360/BFF_Settings/pull/132))
 - feat: MAIR-805 Relay the second factor in BFF_Settings ([#130](https://github.com/mairie360/BFF_Settings/pull/130))
@@ -27,6 +28,7 @@
 
 ## Différence dev → staging (en dev, pas encore en staging)
 
+- fix: MAIR-682 [Audit 23/10] All BFFs: graceful shutdown on SIGTERM (B7) (#140) ([#140](https://github.com/mairie360/BFF_Settings/pull/140))
 - feat: MAIR-810 Passkeys managed by Core ([#138](https://github.com/mairie360/BFF_Settings/pull/138))
 - feat: MAIR-808 Make the two-factor authentication mandatory (instance policy) ([#132](https://github.com/mairie360/BFF_Settings/pull/132))
 - feat: MAIR-805 Relay the second factor in BFF_Settings ([#130](https://github.com/mairie360/BFF_Settings/pull/130))
@@ -52,6 +54,7 @@ _Rien._
 <!-- release-journal-history:start -->
 | Date | Environnement | Version | Commit | Run |
 | --- | --- | --- | --- | --- |
+| 2026-11-18 01:03 UTC | dev | — | `d5fc231` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/44212034786) |
 | 2026-11-17 23:57 UTC | dev | — | `a3d5e5f` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/44203394040) |
 | 2026-11-17 23:53 UTC | dev | — | `8d1c783` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/44202786485) |
 | 2026-11-17 23:50 UTC | dev | — | `ff75cfa` | [run](https://github.com/mairie360/BFF_Settings/actions/runs/44202078331) |
