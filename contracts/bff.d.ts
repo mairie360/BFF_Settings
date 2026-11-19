@@ -1548,6 +1548,11 @@ export interface components {
              */
             label: string;
             /**
+             * @description Name of the passkey manager Core deduced from the authenticator (iCloud Keychain, Google Password Manager, ...), `null` when unknown.
+             * @example Google Password Manager
+             */
+            provider: string | null;
+            /**
              * @description When the passkey was registered (ISO 8601).
              * @example 2026-11-17T09:30:00+00:00
              */

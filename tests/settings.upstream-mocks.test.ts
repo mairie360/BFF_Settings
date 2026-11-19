@@ -781,7 +781,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       register: '/api/v1/user/me/passkeys/',
       remove: '/api/v1/user/me/passkeys/{id}/',
     } as const;
-    const passkey = { id: 12, label: 'Town hall laptop', created_at: '2026-11-17T09:30:00+00:00', last_used_at: null };
+    const passkey = { id: 12, label: 'Town hall laptop', provider: 'Google Password Manager', created_at: '2026-11-17T09:30:00+00:00', last_used_at: null };
     const credential = { id: 'k3m9x7p2', rawId: 'k3m9x7p2', type: 'public-key', response: { attestationObject: 'o2NmbXRk', clientDataJSON: 'eyJ0eXBl' } };
 
     it('lists the passkeys without any key material', async () => {
@@ -792,6 +792,16 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(response.status).toBe(200);
       expect(response.body).toEqual([passkey]);
       expect(response.headers['cache-control']).toBe('no-store');
+      expectBffContract('get', '/settings/passkeys', response);
+    });
+
+    it('keeps the passkey manager name Core deduced, null when unknown (Login proposes it as the name)', async () => {
+      coreApi.on('get', PK.list, { body: [passkey, { ...passkey, id: 13, provider: null }] });
+
+      const response = await withSession(request(app).get('/settings/passkeys'));
+
+      expect(response.status).toBe(200);
+      expect(response.body.map((item: { provider: unknown }) => item.provider)).toEqual(['Google Password Manager', null]);
       expectBffContract('get', '/settings/passkeys', response);
     });
 

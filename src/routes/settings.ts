@@ -343,10 +343,11 @@ router.post('/2fa/backup-codes', async (req, res) => {
 });
 
 // Passkeys (MAIR-810): the account routes of Core's WebAuthn passkeys, relayed. The key itself never leaves Core: a passkey
-// is only its id, label and dates. The sign-in with a passkey is `BFF_user`'s (`POST /auth/passkey`).
+// is only its id, label, manager name and dates. The sign-in with a passkey is `BFF_user`'s (`POST /auth/passkey`).
 const PasskeySchema = registry.register('SettingsPasskey', z.object({
   id: z.number().int().openapi({ description: 'Identifier to give to `DELETE /settings/passkeys/{id}`.', example: 12 }),
   label: z.string().openapi({ description: 'Name the agent gave to the passkey.', example: 'Town hall laptop' }),
+  provider: z.string().nullable().openapi({ description: 'Name of the passkey manager Core deduced from the authenticator (iCloud Keychain, Google Password Manager, ...), `null` when unknown.', example: 'Google Password Manager' }),
   created_at: z.string().openapi({ description: 'When the passkey was registered (ISO 8601).', example: '2026-11-17T09:30:00+00:00' }),
   last_used_at: z.string().nullable().openapi({ description: 'Last sign-in with this passkey (ISO 8601), `null` when never used.', example: null }),
 }));
