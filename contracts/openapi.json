@@ -702,6 +702,14 @@
             "description": "Name the agent gave to the passkey.",
             "example": "Town hall laptop"
           },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name of the passkey manager Core deduced from the authenticator (iCloud Keychain, Google Password Manager, ...), `null` when unknown.",
+            "example": "Google Password Manager"
+          },
           "created_at": {
             "type": "string",
             "description": "When the passkey was registered (ISO 8601).",
@@ -719,6 +727,7 @@
         "required": [
           "id",
           "label",
+          "provider",
           "created_at",
           "last_used_at"
         ]
