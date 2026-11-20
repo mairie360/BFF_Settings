@@ -189,7 +189,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Profile saved, then read again */
+                /** @description Profile saved, then read again. A changed `email` is not applied yet: Core e-mails a confirmation link to the new address and the profile shows it as `pending_email` */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1356,6 +1356,12 @@ export interface components {
              * @example FR
              */
             phone_country?: string | null;
+            /**
+             * Format: email
+             * @description New e-mail address waiting for its confirmation link (valid one hour); `email` stays the current address until then. Absent or `null` when there is none
+             * @example security-admin@nouvelle-adresse.fr
+             */
+            pending_email?: string | null;
         };
         SettingsProfilePatch: {
             /** @example Security */
