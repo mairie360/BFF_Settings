@@ -83,6 +83,9 @@ genuine one. Tests sign their tokens with EdDSA like Core (`sessionToken`, `bear
     persisted profile. When `email` is sent it first reads the profile: an unchanged address (trimmed,
     case-insensitive) is dropped, since the front always sends it; only a real change needs `current_password`
     (Core API 2.0, MAIR-390), and a patch left empty answers the current profile without PATCH.
+    A real change is not applied by Core until the link e-mailed to the new address is opened: the profile then
+    carries it as `pending_email` (absent or `null` when none) next to the unchanged `email`, in this answer and in
+    `GET /settings/bootstrap`. The confirmation page is a Login front route, not a BFF one.
   - `PATCH /settings/{appearance,general}` relay Core `PATCH /api/v1/user/me/preferences/` and
     `PATCH /settings/notifications` relays `PATCH /api/v1/user/me/notifications/`: strict per-section schemas
     mirroring the Core rules, stricter for `density`, `date_format` (the front's values) and `language` (language

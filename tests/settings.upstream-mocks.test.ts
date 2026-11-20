@@ -523,6 +523,34 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(coreApi.calls(CORE.me, 'patch')[0].body).toEqual({ email: 'anne.new@mairie.test', current_password: 'Anne-Password-1' });
     });
 
+    // MAIR-696: Core only applies a new e-mail once its link is opened; until then the profile carries the
+    // address waiting for confirmation and keeps the current one.
+    test('MAIR-696 a changed e-mail is answered as pending, the current address is kept', async () => {
+      const waiting = meResponse({ pending_email: 'anne.new@mairie.test' });
+      let reads = 0;
+      coreApi
+        .on('patch', CORE.me, { status: 200 })
+        .on('get', CORE.me, () => ({ body: reads++ === 0 ? meResponse() : waiting }));
+
+      const response = await withSession(request(app).patch('/settings/profile').send({ email: 'anne.new@mairie.test', current_password: 'Anne-Password-1' }));
+
+      expect(response.status).toBe(200);
+      expectBffContract('patch', '/settings/profile', response);
+      expect(response.body).toEqual(profileOf(waiting));
+      expect(response.body.email).toBe('anne.le-gall@mairie.test');
+      expect(response.body.pending_email).toBe('anne.new@mairie.test');
+    });
+
+    test('MAIR-696 the bootstrap shows the pending address, and null when there is none', async () => {
+      coreApi.on('get', CORE.me, { body: meResponse({ pending_email: 'anne.new@mairie.test' }) });
+      const waiting = await withSession(request(app).get('/settings/bootstrap'));
+      expect(waiting.body.profile.pending_email).toBe('anne.new@mairie.test');
+
+      coreApi.on('get', CORE.me, { body: meResponse({ pending_email: null }) });
+      const none = await withSession(request(app).get('/settings/bootstrap'));
+      expect(none.body.profile.pending_email).toBeNull();
+    });
+
     // Core API (MAIR-480) parses the number as typed against its country and answers it in E.164.
     test.each([
       ['a national number with its country', { phone: '06 12 34.56-78', phone_country: 'FR' }],

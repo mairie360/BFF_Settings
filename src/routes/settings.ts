@@ -32,6 +32,11 @@ export const ProfileSchema = registry.register('SettingsProfile', z.object({
   // Core API (MAIR-480) answers the phone in E.164 next to its country.
   phone: z.string().nullable().optional().openapi({ example: '+33612345678' }),
   phone_country: z.string().nullable().optional().openapi({ description: 'ISO 3166-1 alpha-2 country of the phone', example: 'FR' }),
+  // Core API: a changed e-mail only applies once its owner opens the link sent to the new address.
+  pending_email: z.string().email().nullable().optional().openapi({
+    description: 'New e-mail address waiting for its confirmation link (valid one hour); `email` stays the current address until then. Absent or `null` when there is none',
+    example: 'security-admin@nouvelle-adresse.fr',
+  }),
 }));
 // Edits follow the database columns (names up to 64 characters, phone up to 15): a longer value made
 // Core API 1.2.0 fail with a 500 (Core 2.0 enforces the same limits with a 400). Names are rendered by the fronts, so `<`
@@ -188,7 +193,7 @@ router.get('/bootstrap', async (req, res) => {
 registry.registerPath({ method: 'patch', path: '/settings/profile', summary: 'Update the profile of the signed-in user', request: {
   body: { required: true, content: { 'application/json': { schema: ProfilePatchSchema } } },
 }, responses: {
-  200: { description: 'Profile saved, then read again', content: { 'application/json': { schema: ProfileSchema } } },
+  200: { description: 'Profile saved, then read again. A changed `email` is not applied yet: Core e-mails a confirmation link to the new address and the profile shows it as `pending_email`', content: { 'application/json': { schema: ProfileSchema } } },
   400: { description: 'Invalid or unsupported fields, or a changed `email` without `current_password`', ...errorContent },
   ...upstreamErrors,
   403: { description: '`email` sent with a wrong `current_password`, or an account without password', ...errorContent },

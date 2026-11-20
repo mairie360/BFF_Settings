@@ -126,6 +126,15 @@
             ],
             "description": "ISO 3166-1 alpha-2 country of the phone",
             "example": "FR"
+          },
+          "pending_email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email",
+            "description": "New e-mail address waiting for its confirmation link (valid one hour); `email` stays the current address until then. Absent or `null` when there is none",
+            "example": "security-admin@nouvelle-adresse.fr"
           }
         },
         "required": [
@@ -932,7 +941,7 @@
         },
         "responses": {
           "200": {
-            "description": "Profile saved, then read again",
+            "description": "Profile saved, then read again. A changed `email` is not applied yet: Core e-mails a confirmation link to the new address and the profile shows it as `pending_email`",
             "content": {
               "application/json": {
                 "schema": {
