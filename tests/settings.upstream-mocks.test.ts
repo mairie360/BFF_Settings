@@ -1157,6 +1157,16 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       const font = await withSession(request(app).patch('/settings/appearance').send({ font_family: 'Comic Sans' }));
       expect(font.status).toBe(400);
     });
+
+    test('MAIR-1128: relays Lora, the fourth font of the closed list', async () => {
+      coreApi.on('patch', CORE.preferences, { body: { ...preferences(), font_family: 'lora' } });
+      const response = await withSession(request(app).patch('/settings/appearance').send({ font_family: 'lora' }));
+      expect(response.status).toBe(200);
+      expectBffContract('patch', '/settings/appearance', response);
+      expect(response.body.font_family).toBe('lora');
+      const [patch] = coreApi.calls(CORE.preferences, 'patch');
+      expect(patch.body).toEqual({ font_family: 'lora' });
+    });
   });
 
   describe('GET /check_apis', () => {

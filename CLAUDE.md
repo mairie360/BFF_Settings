@@ -99,7 +99,7 @@ genuine one. Tests sign their tokens with EdDSA like Core (`sessionToken`, `bear
     again from Core (`revoked` added by the second). `POST /settings/password {current_password, new_password}` relays
     `POST /api/v1/user/me/password` (204; 400 / 403 kept; 429 relayed with `Retry-After`; never retried). New fields:
     `general.autosave`, `notifications.system_updates` / `login_alerts`; `font_family` is a closed list (`system`, `geist`,
-    `atkinson`). The k6 session handlers open a session at Core first (`CORE_URL`, the seeded agents' password).
+    `atkinson`, `lora` since MAIR-1128). The k6 session handlers open a session at Core first (`CORE_URL`, the seeded agents' password).
   - Every `/settings` route documents 401/502/503 through `upstreamErrors`; the contract tests fail on
     any status the route can return but does not declare.
 

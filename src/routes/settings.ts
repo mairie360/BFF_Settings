@@ -80,7 +80,8 @@ const PreferenceText = (max: number) => z.string().max(max)
   .regex(/^\P{Cc}*$/u, 'Must not contain control characters');
 const FontSize = z.number().int().min(1).max(32767);
 // The fonts the Settings V2 front offers (MAIR-912): a closed list, `null` resets to the system font.
-const FONT_FAMILIES = ['system', 'geist', 'atkinson'] as const;
+// The named fonts of lib-components (MAIR-912, MAIR-1128), the ones Core accepts for the Settings V2 front.
+const FONT_FAMILIES = ['system', 'geist', 'atkinson', 'lora'] as const;
 // The values the Settings front offers (lib-components `settings/options.ts`). Core stores any short text,
 // so the BFF is stricter: anything else is a 400.
 const DENSITIES = ['compact', 'normal', 'comfortable'] as const;
@@ -99,7 +100,7 @@ export const AppearanceSchema = registry.register('SettingsAppearance', z.object
 }));
 export const AppearancePatchSchema = registry.register('SettingsAppearancePatch', z.object({
   theme: z.enum(THEMES).nullable().openapi({ example: 'dark' }),
-  font_family: z.enum(FONT_FAMILIES).nullable().openapi({ description: 'Font of the interface: `system`, `geist` or `atkinson` (Atkinson Hyperlegible); `null` resets it', example: 'atkinson' }),
+  font_family: z.enum(FONT_FAMILIES).nullable().openapi({ description: 'Font of the interface: `system`, `geist`, `atkinson` (Atkinson Hyperlegible) or `lora` (MAIR-1128); `null` resets it', example: 'atkinson' }),
   font_size: FontSize.nullable().openapi({ example: 16 }),
   density: z.enum(DENSITIES).nullable().openapi({ example: 'compact' }),
 }).partial().strict());

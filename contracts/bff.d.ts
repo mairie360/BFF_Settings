@@ -1682,11 +1682,11 @@ export interface components {
              */
             theme?: "light" | "dark" | "system" | null;
             /**
-             * @description Font of the interface: `system`, `geist` or `atkinson` (Atkinson Hyperlegible); `null` resets it
+             * @description Font of the interface: `system`, `geist`, `atkinson` (Atkinson Hyperlegible) or `lora` (MAIR-1128); `null` resets it
              * @example atkinson
              * @enum {string|null}
              */
-            font_family?: "system" | "geist" | "atkinson" | null;
+            font_family?: "system" | "geist" | "atkinson" | "lora" | null;
             /** @example 16 */
             font_size?: number | null;
             /**
