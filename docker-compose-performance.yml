@@ -193,6 +193,8 @@ services:
       - ./cicd-repo/tests/k6/coverage.js:/coverage.js:ro
     environment:
       BASE_URL: http://bff-settings:4008
+      # MAIR-823: the session handlers open a session at Core (the signed tokens carry no session id).
+      CORE_URL: http://core:3000
       # Load profile of load-test.js: `ci` (default, sized for the 4 vCPU CI runner) or `stress` (MAIR-474).
       K6_PROFILE: ${K6_PROFILE:-ci}
       # EdDSA tokens of the run, signed by performance_test.sh like Core (k6 cannot sign Ed25519, MAIR-680).

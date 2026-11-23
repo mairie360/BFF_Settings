@@ -193,6 +193,39 @@
         },
         "additionalProperties": false
       },
+      "SettingsSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "device_info": {
+            "type": "string"
+          },
+          "ip_address": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "device_info",
+          "ip_address",
+          "created_at",
+          "expires_at"
+        ]
+      },
       "SettingsAppearance": {
         "type": "object",
         "properties": {
@@ -259,9 +292,14 @@
               "string",
               "null"
             ],
-            "maxLength": 128,
-            "pattern": "\\S",
-            "example": "Marianne"
+            "enum": [
+              "system",
+              "geist",
+              "atkinson",
+              null
+            ],
+            "description": "Font of the interface: `system`, `geist` or `atkinson` (Atkinson Hyperlegible); `null` resets it",
+            "example": "atkinson"
           },
           "font_size": {
             "type": [
@@ -325,6 +363,14 @@
               "null"
             ],
             "example": false
+          },
+          "autosave": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Drafts saved automatically every 30 seconds (MAIR-921)",
+            "example": true
           }
         },
         "required": [
@@ -332,7 +378,8 @@
           "timezone",
           "date_format",
           "home_page",
-          "auto_open_notifications"
+          "auto_open_notifications",
+          "autosave"
         ]
       },
       "SettingsGeneralPatch": {
@@ -383,6 +430,14 @@
               "null"
             ],
             "example": false
+          },
+          "autosave": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Drafts saved automatically every 30 seconds (MAIR-921)",
+            "example": true
           }
         },
         "additionalProperties": false
@@ -431,6 +486,20 @@
               "null"
             ],
             "example": false
+          },
+          "system_updates": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "example": true
+          },
+          "login_alerts": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "example": false
           }
         },
         "required": [
@@ -439,7 +508,9 @@
           "desktop",
           "messages",
           "projects",
-          "calendar"
+          "calendar",
+          "system_updates",
+          "login_alerts"
         ]
       },
       "SettingsNotificationsPatch": {
@@ -486,6 +557,20 @@
               "null"
             ],
             "example": false
+          },
+          "system_updates": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "example": true
+          },
+          "login_alerts": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "example": false
           }
         },
         "additionalProperties": false
@@ -499,37 +584,21 @@
           "sessions": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "device_info": {
-                  "type": "string"
-                },
-                "ip_address": {
-                  "type": "string"
-                },
-                "created_at": {
-                  "type": "string"
-                },
-                "expires_at": {
-                  "type": "string"
-                },
-                "revoked_at": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                }
-              },
-              "required": [
-                "id",
-                "device_info",
-                "ip_address",
-                "created_at",
-                "expires_at"
-              ]
+              "$ref": "#/components/schemas/SettingsSession"
+            }
+          },
+          "current_session_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Id of the session of the request, never offered to the disconnection",
+            "example": "0b6f2a54-3c1d-4e0a-9f41-6d2b1c7e8a90"
+          },
+          "session_history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SettingsSession"
             }
           },
           "appearance": {
@@ -572,6 +641,13 @@
                   "unavailable"
                 ]
               },
+              "session_history": {
+                "type": "string",
+                "enum": [
+                  "available",
+                  "unavailable"
+                ]
+              },
               "preferences": {
                 "type": "string",
                 "enum": [
@@ -589,6 +665,7 @@
             },
             "required": [
               "sessions",
+              "session_history",
               "preferences",
               "notifications"
             ]
@@ -597,6 +674,8 @@
         "required": [
           "profile",
           "sessions",
+          "current_session_id",
+          "session_history",
           "appearance",
           "general",
           "notifications",
@@ -793,6 +872,73 @@
           "label",
           "credential"
         ]
+      },
+      "SettingsSessions": {
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SettingsSession"
+            },
+            "description": "Active sessions after the change"
+          },
+          "session_history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SettingsSession"
+            },
+            "description": "First page of the history after the change, newest first"
+          }
+        },
+        "required": [
+          "sessions",
+          "session_history"
+        ]
+      },
+      "SettingsRevokeOthers": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SettingsSessions"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "revoked": {
+                "type": "integer",
+                "description": "Number of sessions ended",
+                "example": 2
+              }
+            },
+            "required": [
+              "revoked"
+            ]
+          }
+        ]
+      },
+      "SettingsPasswordChange": {
+        "type": "object",
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "Current password of the account",
+            "example": "current-password"
+          },
+          "new_password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 255,
+            "description": "New password, 8 to 255 characters, different from the current one",
+            "example": "New-password-2026"
+          }
+        },
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {}
@@ -2001,6 +2147,266 @@
           },
           "404": {
             "description": "No such passkey among the caller's (another account's answers the same)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Core is unavailable, failed or answered an unexpected status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings/sessions/{id}": {
+      "delete": {
+        "summary": "End one of my other sessions",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "0b6f2a54-3c1d-4e0a-9f41-6d2b1c7e8a90"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session ended; the sessions as Core holds them now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsSessions"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The id is not a session id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No active session of the caller has this id (unknown, another account's, already ended)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The id is the session of this request: sign out instead",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Core is unavailable, failed or answered an unexpected status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings/sessions/revoke-others": {
+      "post": {
+        "summary": "End every session but this one",
+        "responses": {
+          "200": {
+            "description": "Other sessions ended; how many, and the sessions as Core holds them now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsRevokeOthers"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Core is unavailable, failed or answered an unexpected status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings/password": {
+      "post": {
+        "summary": "Change my password",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsPasswordChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Password changed; every other session of the account is ended"
+          },
+          "400": {
+            "description": "Missing field, a new password outside 8-255 characters, or equal to the current one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Wrong current password, or an account without password",
             "content": {
               "application/json": {
                 "schema": {

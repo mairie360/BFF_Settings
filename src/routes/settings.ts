@@ -1,4 +1,4 @@
-import { asCaller, callUpstream, parseRequest, requireSession, validationError } from '@mairie360/bffs-lib';
+import { asCaller, bearerToken, callUpstream, parseRequest, requireSession, validationError } from '@mairie360/bffs-lib';
 import { Router, type Request } from 'express';
 import { z } from 'zod';
 import { registry, ErrorSchema } from '../openapi-registry';
@@ -65,9 +65,9 @@ export const ProfilePatchSchema = registry.register('SettingsProfilePatch', z.ob
   }),
 }).partial().strict());
 const PROFILE_FIELDS = ['first_name', 'last_name', 'email', 'phone', 'phone_country'] as const;
-const SessionSchema = z.object({
+const SessionSchema = registry.register('SettingsSession', z.object({
   id: z.string(), device_info: z.string(), ip_address: z.string(), created_at: z.string(), expires_at: z.string(), revoked_at: z.string().nullable().optional(),
-});
+}));
 
 // Preferences and notification settings stored by Core API (`/api/v1/user/me/preferences/` and
 // `/api/v1/user/me/notifications/`). Every field is nullable: `null` means "application default", and
@@ -79,6 +79,8 @@ const PreferenceText = (max: number) => z.string().max(max)
   // Unicode Cc, like Rust `char::is_control`. The OpenAPI document only keeps the first pattern (`\S`).
   .regex(/^\P{Cc}*$/u, 'Must not contain control characters');
 const FontSize = z.number().int().min(1).max(32767);
+// The fonts the Settings V2 front offers (MAIR-912): a closed list, `null` resets to the system font.
+const FONT_FAMILIES = ['system', 'geist', 'atkinson'] as const;
 // The values the Settings front offers (lib-components `settings/options.ts`). Core stores any short text,
 // so the BFF is stricter: anything else is a 400.
 const DENSITIES = ['compact', 'normal', 'comfortable'] as const;
@@ -86,8 +88,8 @@ const DATE_FORMATS = ['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'] as const;
 /** ISO 639 language code, optionally with an ISO 3166 region: `fr`, `en`, `fr-FR`. */
 const Language = z.string().regex(/^[a-z]{2,3}(-[A-Z]{2})?$/, 'Must be a language code such as `fr` or `fr-FR`');
 const APPEARANCE_FIELDS = ['theme', 'font_family', 'font_size', 'density'] as const;
-const GENERAL_FIELDS = ['language', 'timezone', 'date_format', 'home_page', 'auto_open_notifications'] as const;
-const NOTIFICATION_FIELDS = ['email', 'push', 'desktop', 'messages', 'projects', 'calendar'] as const;
+const GENERAL_FIELDS = ['language', 'timezone', 'date_format', 'home_page', 'auto_open_notifications', 'autosave'] as const;
+const NOTIFICATION_FIELDS = ['email', 'push', 'desktop', 'messages', 'projects', 'calendar', 'system_updates', 'login_alerts'] as const;
 
 export const AppearanceSchema = registry.register('SettingsAppearance', z.object({
   theme: z.enum(THEMES).nullable().openapi({ example: 'dark' }),
@@ -97,7 +99,7 @@ export const AppearanceSchema = registry.register('SettingsAppearance', z.object
 }));
 export const AppearancePatchSchema = registry.register('SettingsAppearancePatch', z.object({
   theme: z.enum(THEMES).nullable().openapi({ example: 'dark' }),
-  font_family: PreferenceText(128).nullable().openapi({ example: 'Marianne' }),
+  font_family: z.enum(FONT_FAMILIES).nullable().openapi({ description: 'Font of the interface: `system`, `geist` or `atkinson` (Atkinson Hyperlegible); `null` resets it', example: 'atkinson' }),
   font_size: FontSize.nullable().openapi({ example: 16 }),
   density: z.enum(DENSITIES).nullable().openapi({ example: 'compact' }),
 }).partial().strict());
@@ -107,6 +109,7 @@ export const GeneralSchema = registry.register('SettingsGeneral', z.object({
   date_format: z.string().nullable().openapi({ example: 'DD/MM/YYYY' }),
   home_page: z.string().nullable().openapi({ example: '/dashboard' }),
   auto_open_notifications: z.boolean().nullable().openapi({ example: false }),
+  autosave: z.boolean().nullable().openapi({ description: 'Drafts saved automatically every 30 seconds (MAIR-921)', example: true }),
 }));
 export const GeneralPatchSchema = registry.register('SettingsGeneralPatch', z.object({
   language: Language.nullable().openapi({ example: 'fr' }),
@@ -114,11 +117,14 @@ export const GeneralPatchSchema = registry.register('SettingsGeneralPatch', z.ob
   date_format: z.enum(DATE_FORMATS).nullable().openapi({ example: 'DD/MM/YYYY' }),
   home_page: PreferenceText(128).nullable().openapi({ example: '/dashboard' }),
   auto_open_notifications: z.boolean().nullable().openapi({ example: false }),
+  autosave: z.boolean().nullable().openapi({ description: 'Drafts saved automatically every 30 seconds (MAIR-921)', example: true }),
 }).partial().strict());
 const notificationFlags = (optional: boolean) => {
   const flag = (example: boolean) => (optional ? z.boolean().nullable().optional() : z.boolean().nullable()).openapi({ example });
   return {
     email: flag(true), push: flag(false), desktop: flag(true), messages: flag(true), projects: flag(true), calendar: flag(false),
+    // MAIR-902: notification type « Mises à jour système »; MAIR-876: e-mail Core sends at every new sign-in.
+    system_updates: flag(true), login_alerts: flag(false),
   };
 };
 export const NotificationsSchema = registry.register('SettingsNotifications', z.object(notificationFlags(false)));
@@ -128,7 +134,7 @@ export const NotificationsPatchSchema = registry.register('SettingsNotifications
 const CorePreferencesSchema = z.object({
   theme: z.enum(THEMES).nullish(), font_family: z.string().nullish(), font_size: z.number().int().nullish(), density: z.string().nullish(),
   language: z.string().nullish(), timezone: z.string().nullish(), date_format: z.string().nullish(), home_page: z.string().nullish(),
-  auto_open_notifications: z.boolean().nullish(),
+  auto_open_notifications: z.boolean().nullish(), autosave: z.boolean().nullish(),
 });
 const CoreNotificationsSchema = z.object(Object.fromEntries(NOTIFICATION_FIELDS.map((field) => [field, z.boolean().nullish()])));
 
@@ -140,18 +146,47 @@ function pick<K extends string>(fields: readonly K[], source: Partial<Record<K, 
 const availability = z.enum(['available', 'unavailable']);
 export const BootstrapSchema = registry.register('SettingsBootstrap', z.object({
   profile: ProfileSchema, sessions: z.array(SessionSchema),
+  // MAIR-823: the session of this request (the `sid` of its token, `null` for a token without one), and the first page
+  // of Core's history of the sessions (newest first, active, expired and revoked ones).
+  current_session_id: z.string().nullable().openapi({ description: 'Id of the session of the request, never offered to the disconnection', example: '0b6f2a54-3c1d-4e0a-9f41-6d2b1c7e8a90' }),
+  session_history: z.array(SessionSchema),
   // `null` when Core could not be read (see `sources`). A union, not `.nullable()`: zod-to-openapi turns a
   // nullable registered schema into an `allOf` that refuses `null`.
   appearance: z.union([AppearanceSchema, z.null()]),
   general: z.union([GeneralSchema, z.null()]),
   notifications: z.union([NotificationsSchema, z.null()]),
-  sources: z.object({ sessions: availability, preferences: availability, notifications: availability }),
+  sources: z.object({ sessions: availability, session_history: availability, preferences: availability, notifications: availability }),
 }));
 registry.registerPath({ method: 'get', path: '/settings/bootstrap', summary: 'Load the settings page of the signed-in user', responses: {
   200: { description: 'Core profile, sessions, preferences and notification settings of the signed-in user', content: { 'application/json': { schema: BootstrapSchema } } },
   ...upstreamErrors, 502: { description: 'Profile unavailable', ...errorContent },
 } });
 const SessionsResultSchema = z.object({ sessions: z.array(SessionSchema) });
+
+/**
+ * The session id (`sid` claim) of the request's token, `null` when it carries none. Only read after `requireSession`
+ * verified the token's signature, so the claim can be trusted.
+ */
+export function currentSessionId(req: Request): string | null {
+  const token = bearerToken(req);
+  if (!token) return null;
+  try {
+    const claims: unknown = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8'));
+    const sid = (claims as { sid?: unknown }).sid;
+    return typeof sid === 'string' && /^[0-9a-f-]{36}$/i.test(sid) ? sid : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Core's active sessions and the first page of its history, both required (a failure is the answer). */
+async function readSessions(req: Request) {
+  const [sessions, history] = await Promise.all([
+    callUpstream('CORE_API', async () => SessionsResultSchema.parse((await coreApi.getActiveSessions(asCaller('CORE_API', req))).data).sessions, { declared: [401], retry: true }),
+    callUpstream('CORE_API', async () => SessionsResultSchema.parse((await coreApi.history(undefined, asCaller('CORE_API', req))).data).sessions, { declared: [401], retry: true }),
+  ]);
+  return { sessions, session_history: history };
+}
 
 /** The caller's Core profile; an invalid answer is a 502 (`The CORE_API answer is invalid.`). */
 async function readProfile(req: Request) {
@@ -172,11 +207,12 @@ async function optionalRead<T>(read: () => Promise<T>): Promise<T | undefined> {
 }
 
 router.get('/bootstrap', async (req, res) => {
-  // The four reads are independent: they start together (MAIR-525). The profile is required (its failure is the
-  // answer); sessions, preferences and notification settings are optional: each failure only marks its source.
-  const [profile, sessions, preferences, notifications] = await Promise.all([
+  // The five reads are independent: they start together (MAIR-525). The profile is required (its failure is the
+  // answer); sessions, their history, preferences and notification settings are optional: each failure only marks its source.
+  const [profile, sessions, history, preferences, notifications] = await Promise.all([
     readProfile(req),
     optionalRead(async () => SessionsResultSchema.parse((await coreApi.getActiveSessions(asCaller('CORE_API', req))).data).sessions),
+    optionalRead(async () => SessionsResultSchema.parse((await coreApi.history(undefined, asCaller('CORE_API', req))).data).sessions),
     optionalRead(async () => CorePreferencesSchema.parse((await coreApi.getMyPreferences(asCaller('CORE_API', req))).data)),
     optionalRead(async () => CoreNotificationsSchema.parse((await coreApi.getMyNotificationSettings(asCaller('CORE_API', req))).data)),
   ]);
@@ -184,10 +220,14 @@ router.get('/bootstrap', async (req, res) => {
   return res.json(BootstrapSchema.parse({
     profile,
     sessions: sessions ?? [],
+    current_session_id: currentSessionId(req),
+    session_history: history ?? [],
     appearance: preferences ? pick(APPEARANCE_FIELDS, preferences) : null,
     general: preferences ? pick(GENERAL_FIELDS, preferences) : null,
     notifications: notifications ? pick(NOTIFICATION_FIELDS, notifications) : null,
-    sources: { sessions: source(sessions), preferences: source(preferences), notifications: source(notifications) },
+    sources: {
+      sessions: source(sessions), session_history: source(history), preferences: source(preferences), notifications: source(notifications),
+    },
   }));
 });
 registry.registerPath({ method: 'patch', path: '/settings/profile', summary: 'Update the profile of the signed-in user', request: {
@@ -410,6 +450,63 @@ registry.registerPath({ method: 'delete', path: '/settings/passkeys/{id}', summa
 router.delete('/passkeys/:id', async (req, res) => {
   const { id } = parseRequest(PasskeyIdParams, req.params, 'params');
   await callUpstream('CORE_API', () => coreApi.deleteMyPasskey(id, asCaller('CORE_API', req)), { declared: [400, 401, 404] });
+  return res.status(204).send();
+});
+
+// Sessions (MAIR-892, MAIR-823): end one of the other sessions, or all of them. The answer is the sessions read again
+// from Core, so the front shows what the server holds.
+const SessionsStateSchema = registry.register('SettingsSessions', z.object({
+  sessions: z.array(SessionSchema).openapi({ description: 'Active sessions after the change' }),
+  session_history: z.array(SessionSchema).openapi({ description: 'First page of the history after the change, newest first' }),
+}));
+const RevokeOthersResultSchema = registry.register('SettingsRevokeOthers', SessionsStateSchema.extend({
+  revoked: z.number().int().openapi({ description: 'Number of sessions ended', example: 2 }),
+}));
+const SessionIdParams = z.object({ id: z.string().uuid().openapi({ example: '0b6f2a54-3c1d-4e0a-9f41-6d2b1c7e8a90' }) });
+const CoreRevokeOthersSchema = z.object({ revoked: z.number().int() });
+registry.registerPath({ method: 'delete', path: '/settings/sessions/{id}', summary: 'End one of my other sessions', request: { params: SessionIdParams }, responses: {
+  200: { description: 'Session ended; the sessions as Core holds them now', content: { 'application/json': { schema: SessionsStateSchema } } },
+  400: { description: 'The id is not a session id', ...errorContent },
+  404: { description: 'No active session of the caller has this id (unknown, another account\'s, already ended)', ...errorContent },
+  409: { description: 'The id is the session of this request: sign out instead', ...errorContent },
+  ...upstreamErrors,
+} });
+router.delete('/sessions/:id', async (req, res) => {
+  const { id } = parseRequest(SessionIdParams, req.params, 'params');
+  await callUpstream('CORE_API', () => coreApi.revokeSessionById(id, asCaller('CORE_API', req)), { declared: [400, 401, 404, 409] });
+  return res.json(SessionsStateSchema.parse(await readSessions(req)));
+});
+registry.registerPath({ method: 'post', path: '/settings/sessions/revoke-others', summary: 'End every session but this one', responses: {
+  200: { description: 'Other sessions ended; how many, and the sessions as Core holds them now', content: { 'application/json': { schema: RevokeOthersResultSchema } } },
+  ...upstreamErrors,
+} });
+router.post('/sessions/revoke-others', async (req, res) => {
+  const { revoked } = await callUpstream(
+    'CORE_API',
+    async () => CoreRevokeOthersSchema.parse((await coreApi.revokeOtherSessions(asCaller('CORE_API', req))).data),
+    { declared: [401] },
+  );
+  return res.json(RevokeOthersResultSchema.parse({ revoked, ...(await readSessions(req)) }));
+});
+
+// Password (MAIR-876, MAIR-823): Core checks the current password (5 checks per user per 15 minutes, right or wrong:
+// its 429 is relayed with Retry-After), stores the new one and ends every other session. Never logged nor cached.
+const PasswordChangeSchema = registry.register('SettingsPasswordChange', z.object({
+  current_password: z.string().min(1).max(255).openapi({ description: 'Current password of the account', example: 'current-password' }),
+  new_password: z.string().min(8).max(255).openapi({ description: 'New password, 8 to 255 characters, different from the current one', example: 'New-password-2026' }),
+}).strict());
+registry.registerPath({ method: 'post', path: '/settings/password', summary: 'Change my password', request: {
+  body: { required: true, content: { 'application/json': { schema: PasswordChangeSchema } } },
+}, responses: {
+  204: { description: 'Password changed; every other session of the account is ended' },
+  400: { description: 'Missing field, a new password outside 8-255 characters, or equal to the current one', ...errorContent },
+  403: { description: 'Wrong current password, or an account without password', ...errorContent },
+  ...upstreamErrors,
+} });
+router.post('/password', async (req, res) => {
+  const body = parseRequest(PasswordChangeSchema, req.body, 'body');
+  // Not retried: a retry would spend another password check.
+  await callUpstream('CORE_API', () => coreApi.changeMyPassword(body, asCaller('CORE_API', req)), { declared: [400, 401, 403] });
   return res.status(204).send();
 });
 

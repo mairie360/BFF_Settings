@@ -18,6 +18,10 @@ const CONSUMED = [
   { operationId: 'getMe', method: 'get', url: coreApiUrls.getGetMeUrl() },
   { operationId: 'patchMe', method: 'patch', url: coreApiUrls.getPatchMeUrl() },
   { operationId: 'getActiveSessions', method: 'get', url: coreApiUrls.getGetActiveSessionsUrl() },
+  { operationId: 'history', method: 'get', url: coreApiUrls.getHistoryUrl() },
+  { operationId: 'revokeSessionById', method: 'delete', url: coreApiUrls.getRevokeSessionByIdUrl('0b6f2a54-3c1d-4e0a-9f41-6d2b1c7e8a90') },
+  { operationId: 'revokeOtherSessions', method: 'post', url: coreApiUrls.getRevokeOtherSessionsUrl() },
+  { operationId: 'changeMyPassword', method: 'post', url: coreApiUrls.getChangeMyPasswordUrl() },
   { operationId: 'getMyPreferences', method: 'get', url: coreApiUrls.getGetMyPreferencesUrl() },
   { operationId: 'patchMyPreferences', method: 'patch', url: coreApiUrls.getPatchMyPreferencesUrl() },
   { operationId: 'getMyNotificationSettings', method: 'get', url: coreApiUrls.getGetMyNotificationSettingsUrl() },
@@ -119,7 +123,7 @@ describe('preference operations consumed by the BFF', () => {
   });
 
   test.each([
-    ['appearance', AppearancePatchSchema, { theme: 'system', font_family: 'Marianne', font_size: 18, density: null }, 'PatchPreferencesView'],
+    ['appearance', AppearancePatchSchema, { theme: 'system', font_family: 'atkinson', font_size: 18, density: null }, 'PatchPreferencesView'],
     ['general', GeneralPatchSchema, { language: 'fr', timezone: 'Europe/Paris', date_format: null, home_page: '/dashboard', auto_open_notifications: true }, 'PatchPreferencesView'],
     ['notifications', NotificationsPatchSchema, { email: false, push: null, calendar: true }, 'PatchNotificationSettingsView'],
   ] as const)('a %s patch accepted by the BFF is a valid Core body', (_name, schema, body, patchView) => {

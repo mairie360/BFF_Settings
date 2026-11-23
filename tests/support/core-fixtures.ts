@@ -104,6 +104,6 @@ export function notificationSettings(overrides: Partial<UserNotificationSettings
 /** BFF preference sections and the Core operations they relay to (src/routes/settings.ts). */
 export const PREFERENCE_SECTIONS = [
   { section: 'appearance', template: '/api/v1/user/me/preferences/', fields: ['theme', 'font_family', 'font_size', 'density'] },
-  { section: 'general', template: '/api/v1/user/me/preferences/', fields: ['language', 'timezone', 'date_format', 'home_page', 'auto_open_notifications'] },
-  { section: 'notifications', template: '/api/v1/user/me/notifications/', fields: ['email', 'push', 'desktop', 'messages', 'projects', 'calendar'] },
+  { section: 'general', template: '/api/v1/user/me/preferences/', fields: ['language', 'timezone', 'date_format', 'home_page', 'auto_open_notifications', 'autosave'] },
+  { section: 'notifications', template: '/api/v1/user/me/notifications/', fields: ['email', 'push', 'desktop', 'messages', 'projects', 'calendar', 'system_updates', 'login_alerts'] },
 ] as const;
