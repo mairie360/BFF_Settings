@@ -7,6 +7,7 @@ import {
   PREFERENCE_SECTIONS, SESSION_42, SESSION_ANNE, bearer, coreApiUrls, meResponse, notificationSettings, patchMe, preferences, profileOf, session, sessionsResult,
 } from './support/core-fixtures';
 import { captureLogs } from './support/logs';
+import { eddsaToken } from './support/session-keys';
 import { OpenApiContract } from './support/openapi-contract';
 import { loadOrvalContract } from './support/orval-contract';
 
@@ -22,6 +23,7 @@ const coreApi = new ContractMockServer('CORE_API', loadOrvalContract('@mairie360
 const CORE = {
   me: '/api/v1/user/me/',
   sessions: '/api/v1/sessions/',
+  history: '/api/v1/sessions/history',
   preferences: '/api/v1/user/me/preferences/',
   notifications: '/api/v1/user/me/notifications/',
   health: '/health',
@@ -29,10 +31,12 @@ const CORE = {
 // What the bootstrap answers for the default preference mocks (beforeEach).
 const STORED = {
   appearance: { theme: 'dark', font_family: 'Marianne', font_size: 16, density: 'compact' },
-  general: { language: 'fr', timezone: 'Europe/Paris', date_format: 'DD/MM/YYYY', home_page: '/dashboard', auto_open_notifications: false },
-  notifications: { email: true, push: false, desktop: true, messages: true, projects: true, calendar: false },
+  general: { language: 'fr', timezone: 'Europe/Paris', date_format: 'DD/MM/YYYY', home_page: '/dashboard', auto_open_notifications: false, autosave: null },
+  notifications: { email: true, push: false, desktop: true, messages: true, projects: true, calendar: false, system_updates: null, login_alerts: null },
 } as const;
-const ALL_AVAILABLE = { sessions: 'available', preferences: 'available', notifications: 'available' } as const;
+// MAIR-823: the session of the request (none in the default tokens) and the empty history of the default mock.
+const BOOT = { current_session_id: null, session_history: [] } as const;
+const ALL_AVAILABLE = { sessions: 'available', session_history: 'available', preferences: 'available', notifications: 'available' } as const;
 /** Calls received by Core API, as `METHOD path` (path as built by the generated client). */
 const upstreamSequence = () => coreApi.requests.map((call) => `${call.method} ${call.url.pathname}`);
 const called = (method: string, url: string) => `${method} ${url}`;
@@ -45,6 +49,7 @@ beforeEach(() => {
   // The bootstrap reads them on every call, alongside the profile (MAIR-525): tests about them override these replies.
   coreApi
     .on('get', CORE.sessions, { body: sessionsResult([]) })
+    .on('get', CORE.history, { body: sessionsResult([]) })
     .on('get', CORE.preferences, { body: preferences() })
     .on('get', CORE.notifications, { body: notificationSettings() });
   // baseUrl() reads CORE_API_URL and CORE_API_PORT again on every request: no module reload.
@@ -126,7 +131,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       const response = await request(app).get('/settings/bootstrap').set('Authorization', `bearer \t${SESSION_42}`);
 
       expect(response.status).toBe(200);
-      expect(coreApi.requests.map((upstream) => upstream.headers.authorization)).toEqual(Array(4).fill(bearer(SESSION_42)));
+      expect(coreApi.requests.map((upstream) => upstream.headers.authorization)).toEqual(Array(5).fill(bearer(SESSION_42)));
     });
 
     test.each(BFF_ROUTES)('$method $path answers 503 when Core API is not configured', async (route) => {
@@ -164,10 +169,11 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expectBffContract('get', '/settings/bootstrap', response);
       expect(response.headers['cache-control']).toBe('no-store');
       // Core's groups, role and status do not leave the BFF.
-      expect(response.body).toEqual({ profile: profileOf(me), sessions, ...STORED, sources: ALL_AVAILABLE });
+      expect(response.body).toEqual({ profile: profileOf(me), sessions, ...BOOT, ...STORED, sources: ALL_AVAILABLE });
       expect(upstreamSequence().sort()).toEqual([
         called('GET', coreApiUrls.getGetMeUrl()),
         called('GET', coreApiUrls.getGetActiveSessionsUrl()),
+        called('GET', coreApiUrls.getHistoryUrl()),
         called('GET', coreApiUrls.getGetMyNotificationSettingsUrl()),
         called('GET', coreApiUrls.getGetMyPreferencesUrl()),
       ].sort());
@@ -179,19 +185,20 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       }
     });
 
-    test('MAIR-525: sends the four Core reads together, not the profile first', async () => {
+    test('MAIR-525: sends the five Core reads together, not the profile first', async () => {
       const slow = { delayMs: 50 };
       coreApi
         .on('get', CORE.me, { body: meResponse(), ...slow })
         .on('get', CORE.sessions, { body: sessionsResult([]), ...slow })
+        .on('get', CORE.history, { body: sessionsResult([]), ...slow })
         .on('get', CORE.preferences, { body: preferences(), ...slow })
         .on('get', CORE.notifications, { body: notificationSettings(), ...slow });
 
       const response = await withSession(request(app).get('/settings/bootstrap'));
 
       expect(response.status).toBe(200);
-      expect(coreApi.requests).toHaveLength(4);
-      expect(coreApi.maxInFlight).toBe(4);
+      expect(coreApi.requests).toHaveLength(5);
+      expect(coreApi.maxInFlight).toBe(5);
     });
 
     test('MAIR-525: a failed profile is still the answer when the other reads ran alongside it', async () => {
@@ -229,7 +236,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(missingPhone.status).toBe(200);
       expectBffContract('get', '/settings/bootstrap', missingPhone);
       expect(missingPhone.body).toEqual({
-        profile: { first_name: me.first_name, last_name: me.last_name, email: me.email }, sessions: [], ...STORED, sources: ALL_AVAILABLE,
+        profile: { first_name: me.first_name, last_name: me.last_name, email: me.email }, sessions: [], ...BOOT, ...STORED, sources: ALL_AVAILABLE,
       });
     });
 
@@ -248,7 +255,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
 
       expect(response.status).toBe(200);
       expectBffContract('get', '/settings/bootstrap', response);
-      expect(response.body).toEqual({ profile: profileOf(me), sessions: [], ...STORED, sources: { ...ALL_AVAILABLE, sessions: 'unavailable' } });
+      expect(response.body).toEqual({ profile: profileOf(me), sessions: [], ...BOOT, ...STORED, sources: { ...ALL_AVAILABLE, sessions: 'unavailable' } });
     });
 
     test.each<[string, MockReply]>([
@@ -266,7 +273,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(response.status).toBe(200);
       expectBffContract('get', '/settings/bootstrap', response);
       expect(response.body).toEqual({
-        profile: profileOf(me), sessions: [], appearance: null, general: null, notifications: STORED.notifications,
+        profile: profileOf(me), sessions: [], ...BOOT, appearance: null, general: null, notifications: STORED.notifications,
         sources: { ...ALL_AVAILABLE, preferences: 'unavailable' },
       });
     });
@@ -284,7 +291,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(response.status).toBe(200);
       expectBffContract('get', '/settings/bootstrap', response);
       expect(response.body).toEqual({
-        profile: profileOf(me), sessions: [], appearance: STORED.appearance, general: STORED.general, notifications: null,
+        profile: profileOf(me), sessions: [], ...BOOT, appearance: STORED.appearance, general: STORED.general, notifications: null,
         sources: { ...ALL_AVAILABLE, notifications: 'unavailable' },
       });
     });
@@ -301,8 +308,8 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(response.status).toBe(200);
       expectBffContract('get', '/settings/bootstrap', response);
       expect(response.body.appearance).toEqual({ theme: null, font_family: null, font_size: 14, density: null });
-      expect(response.body.general).toEqual({ language: null, timezone: null, date_format: null, home_page: null, auto_open_notifications: null });
-      expect(response.body.notifications).toEqual({ email: null, push: null, desktop: null, messages: null, projects: null, calendar: null });
+      expect(response.body.general).toEqual({ language: null, timezone: null, date_format: null, home_page: null, auto_open_notifications: null, autosave: null });
+      expect(response.body.notifications).toEqual({ email: null, push: null, desktop: null, messages: null, projects: null, calendar: null, system_updates: null, login_alerts: null });
     });
 
     // A well-signed token Core refuses (revoked session): the BFF cannot know it, Core's 401 is kept.
@@ -1011,6 +1018,144 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
 
       expect([confirm.status, disable.status]).toEqual([400, 400]);
       expect(coreApi.requests).toHaveLength(0);
+    });
+  });
+
+
+  describe('MAIR-823 sessions and password routes', () => {
+    const SID = '0b6f2a54-3c1d-4e0a-9f41-6d2b1c7e8a90';
+    const OTHER = '7c1d2e3f-4a5b-4c6d-8e9f-0a1b2c3d4e5f';
+    const CORE_SESSION = (id: string) => `/api/v1/sessions/${id}/`;
+    const CORE_REVOKE_OTHERS = '/api/v1/sessions/revoke-others';
+    const CORE_PASSWORD = '/api/v1/user/me/password';
+    const ended = session(OTHER, { revoked_at: '2026-11-21T09:00:00Z' });
+
+    test('the bootstrap names the session of the request and carries the history', async () => {
+      const history = [session(SID), ended];
+      coreApi.on('get', CORE.me, { body: meResponse() }).on('get', CORE.history, { body: sessionsResult(history) });
+
+      const response = await withSession(request(app).get('/settings/bootstrap'), eddsaToken(7, { claims: { sid: SID } }));
+
+      expect(response.status).toBe(200);
+      expectBffContract('get', '/settings/bootstrap', response);
+      expect(response.body.current_session_id).toBe(SID);
+      expect(response.body.session_history).toEqual(history);
+      expect(response.body.sources.session_history).toBe('available');
+    });
+
+    test('a failed history read only marks it unavailable', async () => {
+      coreApi.on('get', CORE.me, { body: meResponse() }).on('get', CORE.history, coreError(500));
+
+      const response = await withSession(request(app).get('/settings/bootstrap'));
+
+      expect(response.status).toBe(200);
+      expect(response.body.session_history).toEqual([]);
+      expect(response.body.sources).toEqual({ ...ALL_AVAILABLE, session_history: 'unavailable' });
+    });
+
+    test('a sid that is not a session id is ignored', async () => {
+      coreApi.on('get', CORE.me, { body: meResponse() });
+
+      const response = await withSession(request(app).get('/settings/bootstrap'), eddsaToken(7, { claims: { sid: 'not-a-uuid' } }));
+
+      expect(response.status).toBe(200);
+      expect(response.body.current_session_id).toBeNull();
+    });
+
+    test('ends a session and answers the sessions read again from Core', async () => {
+      coreApi
+        .on('delete', '/api/v1/sessions/{sessionId}/', { status: 204, raw: '', outOfContract: true })
+        .on('get', CORE.sessions, { body: sessionsResult([session(SID)]) })
+        .on('get', CORE.history, { body: sessionsResult([session(SID), ended]) });
+
+      const response = await withSession(request(app).delete(`/settings/sessions/${OTHER}`));
+
+      expect(response.status).toBe(200);
+      expectBffContract('delete', `/settings/sessions/${OTHER}`, response);
+      expect(response.body).toEqual({ sessions: [session(SID)], session_history: [session(SID), ended] });
+      expect(upstreamSequence()[0]).toBe(called('DELETE', CORE_SESSION(OTHER)));
+    });
+
+    test.each([404, 409])('keeps the Core %i of an ended session', async (status) => {
+      coreApi.on('delete', '/api/v1/sessions/{sessionId}/', coreError(status, 'Session not found.'));
+
+      const response = await withSession(request(app).delete(`/settings/sessions/${OTHER}`));
+
+      expect(response.status).toBe(status);
+      expect(JSON.stringify(response.body)).not.toContain('Session not found.');
+      expectBffContract('delete', `/settings/sessions/${OTHER}`, response);
+    });
+
+    test('refuses an id that is not a session id before any Core call', async () => {
+      const response = await withSession(request(app).delete('/settings/sessions/abc'));
+
+      expect(response.status).toBe(400);
+      expect(coreApi.requests).toHaveLength(0);
+      expectBffContract('delete', '/settings/sessions/abc', response);
+    });
+
+    test('ends the other sessions and answers how many with the sessions read again', async () => {
+      coreApi
+        .on('post', CORE_REVOKE_OTHERS, { body: { revoked: 2 } })
+        .on('get', CORE.sessions, { body: sessionsResult([session(SID)]) })
+        .on('get', CORE.history, { body: sessionsResult([session(SID), ended]) });
+
+      const response = await withSession(request(app).post('/settings/sessions/revoke-others'));
+
+      expect(response.status).toBe(200);
+      expectBffContract('post', '/settings/sessions/revoke-others', response);
+      expect(response.body).toEqual({ revoked: 2, sessions: [session(SID)], session_history: [session(SID), ended] });
+    });
+
+    test('changes the password: 204, the body forwarded as is', async () => {
+      coreApi.on('post', CORE_PASSWORD, { status: 204, raw: '', outOfContract: true });
+
+      const response = await withSession(request(app).post('/settings/password').send({ current_password: 'old-password', new_password: 'New-password-2026' }));
+
+      expect(response.status).toBe(204);
+      expect(response.text).toBe('');
+      expect(coreApi.requests[0].body).toEqual({ current_password: 'old-password', new_password: 'New-password-2026' });
+      expectBffContract('post', '/settings/password', response);
+    });
+
+    test.each([400, 403])('keeps the Core %i of a refused password', async (status) => {
+      coreApi.on('post', CORE_PASSWORD, coreError(status, 'The current password is incorrect.'));
+
+      const response = await withSession(request(app).post('/settings/password').send({ current_password: 'wrong', new_password: 'New-password-2026' }));
+
+      expect(response.status).toBe(status);
+      expect(JSON.stringify(response.body)).not.toContain('incorrect');
+      expectBffContract('post', '/settings/password', response);
+    });
+
+    test('relays the 429 of Core with its Retry-After', async () => {
+      coreApi.on('post', CORE_PASSWORD, { status: 429, raw: 'Too many requests', contentType: 'text/plain', headers: { 'Retry-After': '120' }, outOfContract: true });
+
+      const response = await withSession(request(app).post('/settings/password').send({ current_password: 'x', new_password: 'New-password-2026' }));
+
+      expect(response.status).toBe(429);
+      expect(response.headers['retry-after']).toBe('120');
+    });
+
+    test.each([
+      ['a short new password', { current_password: 'x', new_password: 'short' }],
+      ['a missing current password', { new_password: 'New-password-2026' }],
+      ['an unknown field', { current_password: 'x', new_password: 'New-password-2026', admin: true }],
+    ])('refuses %s before any Core call', async (_label, body) => {
+      const response = await withSession(request(app).post('/settings/password').send(body));
+
+      expect(response.status).toBe(400);
+      expect(coreApi.requests).toHaveLength(0);
+    });
+
+    test('accepts the new settings fields and refuses a font outside the list', async () => {
+      coreApi.on('patch', CORE.notifications, { body: notificationSettings({ system_updates: true, login_alerts: true }) });
+      const notifications = await withSession(request(app).patch('/settings/notifications').send({ system_updates: true, login_alerts: true }));
+      expect(notifications.status).toBe(200);
+      expect(notifications.body).toEqual(expect.objectContaining({ system_updates: true, login_alerts: true }));
+
+      const font = await withSession(request(app).patch('/settings/appearance').send({ font_family: 'Comic Sans' }));
+      expect(font.status).toBe(400);
     });
   });
 

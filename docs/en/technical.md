@@ -75,6 +75,11 @@ Inventory extracted from `contracts/openapi.json`. Replace brace parameters with
 | PATCH | `/settings/notifications` | application/json | 200, 400, 401, 502, 503 |
 | PATCH | `/settings/appearance` | application/json | 200, 400, 401, 502, 503 |
 | PATCH | `/settings/general` | application/json | 200, 400, 401, 502, 503 |
+| DELETE | `/settings/sessions/{id}` | — | 200, 400, 401, 404, 409, 429, 502, 503 |
+| POST | `/settings/sessions/revoke-others` | — | 200, 401, 429, 502, 503 |
+| POST | `/settings/password` | application/json | 204, 400, 401, 403, 429, 502, 503 |
+
+Settings V2 (MAIR-823): `GET /settings/bootstrap` also answers `current_session_id` (the `sid` claim of the verified token, `null` for a token without one) and `session_history` (first page of Core's `GET /api/v1/sessions/history`, newest first; optional like the sessions, `sources.session_history`). `DELETE /settings/sessions/{id}` (a UUID) relays Core's `DELETE /api/v1/sessions/{sessionId}/` (404 unknown or another account's, 409 the session of the request) and `POST /settings/sessions/revoke-others` relays `POST /api/v1/sessions/revoke-others`; both answer the sessions and the history read again from Core (`revoke-others` adds `revoked`). `POST /settings/password` (`current_password`, `new_password` of 8 to 255 characters) relays `POST /api/v1/user/me/password`: 204, Core's 400 / 403 kept, its 429 relayed with `Retry-After`; Core ends every other session. New fields: `autosave` in the general section, `system_updates` and `login_alerts` in the notification settings; `font_family` only takes `system`, `geist` or `atkinson`.
 
 ## Session, permissions and errors
 

@@ -15,6 +15,9 @@ Les chemins sont relatifs au BFF. Les proxies web conservent méthode, paramètr
 | PATCH | `/settings/notifications` | 200 Préférences enregistrées par Core |
 | PATCH | `/settings/appearance` | 200 Préférences enregistrées par Core |
 | PATCH | `/settings/general` | 200 Préférences enregistrées par Core |
+| DELETE | `/settings/sessions/{id}` | 200 SettingsSessions (sessions relues dans Core) |
+| POST | `/settings/sessions/revoke-others` | 200 SettingsRevokeOthers |
+| POST | `/settings/password` | 204 |
 
 ## Mise à jour et validation
 

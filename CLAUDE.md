@@ -92,6 +92,14 @@ genuine one. Tests sign their tokens with EdDSA like Core (`sessionToken`, `bear
     code), which keeps ZAP's Path Traversal check from flagging free text (unknown field or empty body: 400;
     `null` resets to the default), answer the
     section's fields from Core's answer (missing = `null`).
+  - Settings V2 (MAIR-823): the bootstrap also answers `current_session_id` (the `sid` of the verified token, read by
+    `currentSessionId` once `requireSession` checked the signature; `null` without one) and `session_history` (first page
+    of Core's history, optional: `sources.session_history`). `DELETE /settings/sessions/{id}` (UUID) and
+    `POST /settings/sessions/revoke-others` relay Core's routes (404 / 409 kept) and answer the sessions and history read
+    again from Core (`revoked` added by the second). `POST /settings/password {current_password, new_password}` relays
+    `POST /api/v1/user/me/password` (204; 400 / 403 kept; 429 relayed with `Retry-After`; never retried). New fields:
+    `general.autosave`, `notifications.system_updates` / `login_alerts`; `font_family` is a closed list (`system`, `geist`,
+    `atkinson`). The k6 session handlers open a session at Core first (`CORE_URL`, the seeded agents' password).
   - Every `/settings` route documents 401/502/503 through `upstreamErrors`; the contract tests fail on
     any status the route can return but does not declare.
 

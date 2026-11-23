@@ -1,5 +1,6 @@
 import http from 'k6/http';
 import crypto from 'k6/crypto';
+import encoding from 'k6/encoding';
 import { check, sleep } from 'k6';
 import { createCoverage } from '/coverage.js';
 
@@ -127,6 +128,18 @@ function unenrol(who, code) {
   fixture('POST /settings/2fa/disable', who, { password: AGENT_PASSWORD, code });
 }
 
+// MAIR-823: a fresh session of `who` opened at Core with its password (the tokens of performance_test.sh carry no
+// session id). Its id is the `sid` of the JWT Core answers.
+const CORE_URL = __ENV.CORE_URL || 'http://core:3000';
+function openCoreSession(who) {
+  const response = http.post(`${CORE_URL}/api/v1/auth/login`, JSON.stringify({
+    email: `perf.agent.${who.id}@mairie360.fr`, password: AGENT_PASSWORD, device_info: 'k6',
+  }), { headers: { 'Content-Type': 'application/json' } });
+  if (response.status !== 200) throw new Error(`Core login fixture answered ${response.status}`);
+  const jwt = response.headers.Authorization.replace(/^Bearer /, '');
+  return JSON.parse(encoding.b64decode(jwt.split('.')[1], 'rawurl', 's')).sid;
+}
+
 const handlers = {
   // --- Connectivity (public) ---
   'GET /health': ({ request }) =>
@@ -152,9 +165,36 @@ const handlers = {
       'clear phone 200': (r) => r.status === 200 && (json(r) || {}).phone == null,
     });
   },
-  'PATCH /settings/notifications': preferenceHandler('notifications', { email: true }),
-  'PATCH /settings/appearance': preferenceHandler('appearance', { theme: 'dark' }),
-  'PATCH /settings/general': preferenceHandler('general', { language: 'fr' }),
+  'PATCH /settings/notifications': preferenceHandler('notifications', { system_updates: true }),
+  'PATCH /settings/appearance': preferenceHandler('appearance', { font_family: 'atkinson' }),
+  'PATCH /settings/general': preferenceHandler('general', { autosave: true }),
+
+  // --- Sessions and password (MAIR-823): the writer opens a session at Core first, then ends it here ---
+  'DELETE /settings/sessions/{id}': ({ request }) => {
+    const who = writer();
+    const sid = openCoreSession(who);
+    check(request({ path: { id: sid }, headers: who.headers }), {
+      'end session 200': (r) => r.status === 200,
+      'ended session left the active ones': (r) =>
+        r.status === 200 && !(json(r)?.sessions || []).some((s) => s.id === sid),
+    });
+  },
+  'POST /settings/sessions/revoke-others': ({ request }) => {
+    const who = writer();
+    openCoreSession(who);
+    check(request({ headers: who.headers }), {
+      'revoke others 200': (r) => r.status === 200 && (json(r)?.revoked || 0) >= 1 && (json(r)?.sessions || []).length === 0,
+    });
+  },
+  // Changed, then set back, so the second-factor handlers keep the seeded password.
+  'POST /settings/password': ({ request }) => {
+    const who = writer();
+    const other = `${AGENT_PASSWORD}-k6`;
+    check(request({ body: { current_password: AGENT_PASSWORD, new_password: other }, headers: who.headers }), {
+      'change password 204': (r) => r.status === 204,
+    });
+    fixture('POST /settings/password', who, { current_password: other, new_password: AGENT_PASSWORD });
+  },
 
   // --- Second factor (MAIR-805): the writer ends every handler unprotected again ---
   'GET /settings/2fa': ({ request }) =>

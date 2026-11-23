@@ -1318,6 +1318,277 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** End one of my other sessions */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Session ended; the sessions as Core holds them now */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SettingsSessions"];
+                    };
+                };
+                /** @description The id is not a session id */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Missing, forged or expired session token, or a session Core refuses */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No active session of the caller has this id (unknown, another account's, already ended) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description The id is the session of this request: sign out instead */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core is unavailable, failed or answered an unexpected status */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/sessions/revoke-others": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** End every session but this one */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Other sessions ended; how many, and the sessions as Core holds them now */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SettingsRevokeOthers"];
+                    };
+                };
+                /** @description Missing, forged or expired session token, or a session Core refuses */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core is unavailable, failed or answered an unexpected status */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change my password */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SettingsPasswordChange"];
+                };
+            };
+            responses: {
+                /** @description Password changed; every other session of the account is ended */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Missing field, a new password outside 8-255 characters, or equal to the current one */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Missing, forged or expired session token, or a session Core refuses */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Wrong current password, or an account without password */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core is unavailable, failed or answered an unexpected status */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core or the session key (JWT_PUBLIC_KEY, or JWT_SECRET during the HS256 transition) is not configured */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1383,6 +1654,14 @@ export interface components {
              */
             current_password?: string;
         };
+        SettingsSession: {
+            id: string;
+            device_info: string;
+            ip_address: string;
+            created_at: string;
+            expires_at: string;
+            revoked_at?: string | null;
+        };
         SettingsAppearance: {
             /**
              * @example dark
@@ -1402,8 +1681,12 @@ export interface components {
              * @enum {string|null}
              */
             theme?: "light" | "dark" | "system" | null;
-            /** @example Marianne */
-            font_family?: string | null;
+            /**
+             * @description Font of the interface: `system`, `geist` or `atkinson` (Atkinson Hyperlegible); `null` resets it
+             * @example atkinson
+             * @enum {string|null}
+             */
+            font_family?: "system" | "geist" | "atkinson" | null;
             /** @example 16 */
             font_size?: number | null;
             /**
@@ -1423,6 +1706,11 @@ export interface components {
             home_page: string | null;
             /** @example false */
             auto_open_notifications: boolean | null;
+            /**
+             * @description Drafts saved automatically every 30 seconds (MAIR-921)
+             * @example true
+             */
+            autosave: boolean | null;
         };
         SettingsGeneralPatch: {
             /** @example fr */
@@ -1438,6 +1726,11 @@ export interface components {
             home_page?: string | null;
             /** @example false */
             auto_open_notifications?: boolean | null;
+            /**
+             * @description Drafts saved automatically every 30 seconds (MAIR-921)
+             * @example true
+             */
+            autosave?: boolean | null;
         };
         SettingsNotifications: {
             /** @example true */
@@ -1452,6 +1745,10 @@ export interface components {
             projects: boolean | null;
             /** @example false */
             calendar: boolean | null;
+            /** @example true */
+            system_updates: boolean | null;
+            /** @example false */
+            login_alerts: boolean | null;
         };
         SettingsNotificationsPatch: {
             /** @example true */
@@ -1466,23 +1763,28 @@ export interface components {
             projects?: boolean | null;
             /** @example false */
             calendar?: boolean | null;
+            /** @example true */
+            system_updates?: boolean | null;
+            /** @example false */
+            login_alerts?: boolean | null;
         };
         SettingsBootstrap: {
             profile: components["schemas"]["SettingsProfile"];
-            sessions: {
-                id: string;
-                device_info: string;
-                ip_address: string;
-                created_at: string;
-                expires_at: string;
-                revoked_at?: string | null;
-            }[];
+            sessions: components["schemas"]["SettingsSession"][];
+            /**
+             * @description Id of the session of the request, never offered to the disconnection
+             * @example 0b6f2a54-3c1d-4e0a-9f41-6d2b1c7e8a90
+             */
+            current_session_id: string | null;
+            session_history: components["schemas"]["SettingsSession"][];
             appearance: components["schemas"]["SettingsAppearance"] | null;
             general: components["schemas"]["SettingsGeneral"] | null;
             notifications: components["schemas"]["SettingsNotifications"] | null;
             sources: {
                 /** @enum {string} */
                 sessions: "available" | "unavailable";
+                /** @enum {string} */
+                session_history: "available" | "unavailable";
                 /** @enum {string} */
                 preferences: "available" | "unavailable";
                 /** @enum {string} */
@@ -1607,6 +1909,31 @@ export interface components {
             credential: {
                 [key: string]: unknown;
             };
+        };
+        SettingsSessions: {
+            /** @description Active sessions after the change */
+            sessions: components["schemas"]["SettingsSession"][];
+            /** @description First page of the history after the change, newest first */
+            session_history: components["schemas"]["SettingsSession"][];
+        };
+        SettingsRevokeOthers: components["schemas"]["SettingsSessions"] & {
+            /**
+             * @description Number of sessions ended
+             * @example 2
+             */
+            revoked: number;
+        };
+        SettingsPasswordChange: {
+            /**
+             * @description Current password of the account
+             * @example current-password
+             */
+            current_password: string;
+            /**
+             * @description New password, 8 to 255 characters, different from the current one
+             * @example New-password-2026
+             */
+            new_password: string;
         };
     };
     responses: never;
