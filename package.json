@@ -13,9 +13,9 @@
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "9.1.0",
-    "@mairie360/bffs-lib": "2.7.1",
+    "@mairie360/bffs-lib": "3.0.0",
     "axios": "1.21.1",
-    "dotenv": "17.4.2",
+    "dotenv": "18.0.10",
     "express": "5.3.0",
     "swagger-ui-express": "5.0.1",
     "zod": "4.6.7"
@@ -25,7 +25,7 @@
     "@mairie360/core-api-openapi": "0.0.0-dev-8cab1d6",
     "@types/express": "5.0.6",
     "@types/jest": "30.0.0",
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.0.0",
     "@types/supertest": "7.2.1",
     "@types/swagger-ui-express": "4.1.8",
     "@typescript-eslint/eslint-plugin": "8.73.0",

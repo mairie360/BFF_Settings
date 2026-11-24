@@ -12,7 +12,7 @@ the web service consumes. It holds no database and no local state.
 ## Commands
 
 ```bash
-npm ci                      # install (Node.js 24.22.1 in both workflows and the Docker images)
+npm ci                      # install (Node.js 26.13.1 in both workflows and the Docker images)
 npm run start               # tsx watch src/index.ts, listens on PORT (default 4008; deployed on 4005 by Deploiment)
 npm run build               # tsc -> dist/
 npm run lint                # eslint (flat config: eslint.config.cjs)
@@ -39,13 +39,13 @@ schema — CI (`contracts:check`) and a jest test both fail otherwise. See "Cont
 `/settings`). Every `/settings` request goes through the lib's `noStore` (`Cache-Control: no-store`)
 and `requireSession` (bffs-lib >= 1.2.0, MAIR-474: 401 before any Core call unless `Authorization: Bearer <token>`
 carries a token verified with Core's public key `JWT_PUBLIC_KEY`, EdDSA under Core's `kid` with `iss`, `aud`, `exp`
-and a positive `sub` (MAIR-680, bffs-lib >= 2.7.0; HS256 only while `JWT_SECRET` is still set); cookies and
+and a positive `sub` (MAIR-680; bffs-lib >= 3.0.0 refuses HS256 and never reads `JWT_SECRET`); cookies and
 `x-session-token` are ignored; 503 without a key, and `start()` runs `assertStartupConfiguration()`, which refuses a
-missing or malformed key; `tests/mair-680-eddsa-session.test.ts` pins the EdDSA / HS256 cases). Core
+missing or malformed key, `JWT_SECRET` alone included; `tests/mair-680-eddsa-session.test.ts` pins the EdDSA / HS256 cases). Core
 still checks revocation. `tests/token-refusals.test.ts` walks `contracts/openapi.json`: every operation that
 inherits `bearerAuth` answers 401 to a missing or forged token (other scheme, garbage, other secret, expired,
 `alg: none`, swapped payload, RS256, non-numeric `sub`) without calling Core and gets past the check with a
-genuine one. Tests sign their tokens with EdDSA like Core (`sessionToken`, `bearer()`, `tests/support/session-keys.ts`); `tests/support/env.ts` sets Core's public key and removes `JWT_SECRET` (MAIR-680), so passing a secret to `sessionToken()` gives an HS256 token the default test app refuses. `trust proxy` comes from `TRUST_PROXY` (lib `parseTrustProxy`).
+genuine one. Tests sign their tokens with EdDSA like Core (`sessionToken`, `bearer()`, `tests/support/session-keys.ts`); `tests/support/env.ts` sets Core's public key and removes `JWT_SECRET` (MAIR-680); passing a secret to `sessionToken()` gives an HS256 token the BFF refuses. `trust proxy` comes from `TRUST_PROXY` (lib `parseTrustProxy`).
 
 **Errors (`@mairie360/bffs-lib`).** Every error body is `{ error: { code, message, details } }`, the
 `ErrorResponse` schema (`src/openapi-registry.ts`, the lib's `ErrorResponseSchema.clone()`). Routes throw
@@ -257,8 +257,8 @@ non-401/403 answer. The spec requires `bearerAuth` at the top level (`openapi.ts
   disables it on that line with a comment saying why. The mock server's `delayMs` + `maxInFlight` let a test check it.
 - **ESLint** uses only the flat `eslint.config.cjs` (the legacy `.eslintrc.js` was removed, like in the
   sibling BFFs).
-- **Node version.** `contracts.yml`, `cicd.yml` (`node_version: "24.22.1"`) and every Dockerfile stage use
-  Node 24.22.1; the images pin `node:24.22.1-alpine` by digest (Renovate bumps it).
+- **Node version.** `contracts.yml`, `cicd.yml` (`node_version: "26.13.1"`) and every Dockerfile stage use
+  Node 26.13.1; the images pin `node:26.13.1-alpine` by digest (Renovate bumps it).
 - **Fail fast.** `src/index.ts` loads `dotenv/config` first, then `start()` runs the lib's
   `assertConfigured(UPSTREAMS)` (`['CORE_API']`) before `listen`, only under `require.main === module`.
   Add any new upstream to `UPSTREAMS`.
@@ -268,7 +268,7 @@ non-401/403 answer. The spec requires `bearerAuth` at the top level (`openapi.ts
   so the sync branch is an inert stub — syncing to web-service repos is not wired up here.
 - `.npmrc` points `@mairie360:*` at GitHub Packages and needs `NODE_AUTH_TOKEN`; the only `@mairie360/*`
   package is the `core-api-openapi` devDependency used by the tests (no runtime client).
-- `cicd.yml` calls the shared `mairie360/CICD` `BFFs-cicd.yml@v5.3.1` (with `openapi_spec_path` and
+- `cicd.yml` calls the shared `mairie360/CICD` `BFFs-cicd.yml@v5.14.3` (with `openapi_spec_path` and
   explicit `CODECOV_TOKEN` / `N8N_WEBHOOK_SECRET` secrets); Renovate keeps `cicd_version` aligned with
   the tag, and `.releaserc.json` drives semantic-release.
 - The test stacks pin `core-api` `dev-3b40c2a` (Core's MAIR-746 limiter; the contract package is
