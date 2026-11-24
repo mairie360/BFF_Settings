@@ -61,7 +61,7 @@ export function session(id: string, overrides: Partial<SessionSchema> = {}): Ses
 /** Corps de `GET /api/v1/sessions/` (GetSessionsResultView). */
 export const sessionsResult = (sessions: SessionSchema[]): GetSessionsResultView => ({ sessions });
 
-/** The historical shared secret (MAIR-680): the BFF no longer gets it, so a token signed with it must be refused. */
+/** The historical shared secret (MAIR-680): the BFF never reads it, so a token signed with it must be refused. */
 export const JWT_SECRET = 'settings-contract-test-secret';
 
 /**

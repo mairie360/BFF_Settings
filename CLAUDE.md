@@ -39,13 +39,13 @@ schema — CI (`contracts:check`) and a jest test both fail otherwise. See "Cont
 `/settings`). Every `/settings` request goes through the lib's `noStore` (`Cache-Control: no-store`)
 and `requireSession` (bffs-lib >= 1.2.0, MAIR-474: 401 before any Core call unless `Authorization: Bearer <token>`
 carries a token verified with Core's public key `JWT_PUBLIC_KEY`, EdDSA under Core's `kid` with `iss`, `aud`, `exp`
-and a positive `sub` (MAIR-680, bffs-lib >= 2.7.0; HS256 only while `JWT_SECRET` is still set); cookies and
+and a positive `sub` (MAIR-680; bffs-lib >= 3.0.0 refuses HS256 and never reads `JWT_SECRET`); cookies and
 `x-session-token` are ignored; 503 without a key, and `start()` runs `assertStartupConfiguration()`, which refuses a
-missing or malformed key; `tests/mair-680-eddsa-session.test.ts` pins the EdDSA / HS256 cases). Core
+missing or malformed key, `JWT_SECRET` alone included; `tests/mair-680-eddsa-session.test.ts` pins the EdDSA / HS256 cases). Core
 still checks revocation. `tests/token-refusals.test.ts` walks `contracts/openapi.json`: every operation that
 inherits `bearerAuth` answers 401 to a missing or forged token (other scheme, garbage, other secret, expired,
 `alg: none`, swapped payload, RS256, non-numeric `sub`) without calling Core and gets past the check with a
-genuine one. Tests sign their tokens with EdDSA like Core (`sessionToken`, `bearer()`, `tests/support/session-keys.ts`); `tests/support/env.ts` sets Core's public key and removes `JWT_SECRET` (MAIR-680), so passing a secret to `sessionToken()` gives an HS256 token the default test app refuses. `trust proxy` comes from `TRUST_PROXY` (lib `parseTrustProxy`).
+genuine one. Tests sign their tokens with EdDSA like Core (`sessionToken`, `bearer()`, `tests/support/session-keys.ts`); `tests/support/env.ts` sets Core's public key and removes `JWT_SECRET` (MAIR-680); passing a secret to `sessionToken()` gives an HS256 token the BFF refuses. `trust proxy` comes from `TRUST_PROXY` (lib `parseTrustProxy`).
 
 **Errors (`@mairie360/bffs-lib`).** Every error body is `{ error: { code, message, details } }`, the
 `ErrorResponse` schema (`src/openapi-registry.ts`, the lib's `ErrorResponseSchema.clone()`). Routes throw

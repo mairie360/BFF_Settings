@@ -28,16 +28,17 @@ describe('startup configuration check', () => {
     expect(() => start(0)).toThrow('CORE_API_URL');
   });
 
-  test('MAIR-680 refuses to start without JWT_PUBLIC_KEY (nor JWT_SECRET), which verifies the session tokens', () => {
+  test('MAIR-680 refuses to start without JWT_PUBLIC_KEY even with JWT_SECRET set (bffs-lib 3 ignores it)', () => {
     process.env.CORE_API_URL = 'http://core:3000';
     const key = process.env.JWT_PUBLIC_KEY;
     process.env.JWT_PUBLIC_KEY = '';
-    delete process.env.JWT_SECRET;
+    process.env.JWT_SECRET = 'secret';
 
     try {
       expect(() => start(0)).toThrow('Missing configuration: JWT_PUBLIC_KEY');
     } finally {
       process.env.JWT_PUBLIC_KEY = key;
+      delete process.env.JWT_SECRET;
     }
   });
 
