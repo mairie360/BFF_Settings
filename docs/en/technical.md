@@ -16,7 +16,7 @@ The system panel of the web service reports unavailability. Security displays se
 
 ## Installation and local startup
 
-Use Node.js 24.22.1 to reproduce the contract job and npm with the committed lockfile. Other job and Docker versions are detailed below.
+Use Node.js 26.13.1 to reproduce the contract job and npm with the committed lockfile. Other job and Docker versions are detailed below.
 
 Current direct dependencies include no private `@mairie360/*` client. `.npmrc` still retains the organization’s registry configuration.
 
@@ -103,11 +103,11 @@ The type generator is pinned to `openapi-typescript@7.10.1` in `scripts/contract
 
 ## CI/CD and Docker execution
 
-The `contracts.yml` job uses Node.js 24.22.1, `actions/checkout@v7` and `actions/setup-node@v7`. It runs on pushes, pull requests and manual dispatch; it installs with `npm ci`, checks contracts and runs the associated tests.
+The `contracts.yml` job uses Node.js 26.13.1, `actions/checkout@v7` and `actions/setup-node@v7`. It runs on pushes, pull requests and manual dispatch; it installs with `npm ci`, checks contracts and runs the associated tests.
 
-The `cicd.yml` file calls the shared `mairie360/CICD` `BFFs-cicd.yml@v5.2.2` workflow (`cicd_version: v5.2.2`, `node_version: "24.22.1"`, `openapi_spec_path: contracts/openapi.json`). Releases are handled by semantic-release (`.releaserc.json`). A push to `main` stops after `release-dev`; staging and prod go through the manual `promote-staging.yml` / `promote-prod.yml` workflows (MAIR-494).
+The `cicd.yml` file calls the shared `mairie360/CICD` `BFFs-cicd.yml@v5.14.3` workflow (`cicd_version: v5.14.3`, `node_version: "26.13.1"`, `openapi_spec_path: contracts/openapi.json`). Releases are handled by semantic-release (`.releaserc.json`). A push to `main` stops after `release-dev`; staging and prod go through the manual `promote-staging.yml` / `promote-prod.yml` workflows (MAIR-494).
 
-The Dockerfiles use `node:24.22.1-alpine` pinned by digest for every stage (same Node.js 24.22.1 as both workflows); the image command is `["node", "dist/index.js"]`. GitHub Packages credentials are only mounted as BuildKit secrets (`npmrc`, `node_auth_token`) during `npm ci`.
+The Dockerfiles use `node:26.13.1-alpine` pinned by digest for every stage (same Node.js 26.13.1 as both workflows); the image command is `["node", "dist/index.js"]`. GitHub Packages credentials are only mounted as BuildKit secrets (`npmrc`, `node_auth_token`) during `npm ci`.
 
 `integration_test.sh` (MAIR-262) runs the stack of `docker-compose-integration.yml`: the published Core API image, the database with its migrations and `init-test.sql`, Redis, the BFF image under test and a `newman` service that replays `tests/postman/collection.json` (environment `tests/postman/environment.json`) against the BFF with `--bail`. Its exit code is the exit code of newman. The collection holds working checks (the BFF starts, `/health`, `/check_apis`, `/openapi.json`, the session resolved against Core API for the seeded Admin and agent through `GET /settings/bootstrap`) and the settings round trip of the agent (profile with a phone answered in E.164 and the unchanged e-mail accepted without password, appearance and general sections sharing one Core preferences record, notification settings, every value read back through the bootstrap, the administrator's settings untouched, and `null` restoring the application defaults at the end so the collection is replayable), then, last, the limit on current-password checks (MAIR-746): the seeded administrator's five e-mail changes with a wrong password answer 403, the sixth gets Core's 429 relayed with its `Retry-After`, while a change without e-mail still saves. Core's rate limits stay on in this stack for that reason (they are off in the ZAP and k6 stacks). The seeded accounts are impersonated with EdDSA JWTs that `integration_test.sh` signs with the run's Ed25519 key, like Core (fresh key pair, `stack_secrets.sh`, MAIR-680), plus a forgery under Core's `kid` and an HS256 token, both refused; the committed environment holds no secret. In CI this stack is the `integration_tests` gate of the staging promotion: it blocks the promotion on failure and publishes the junit report (`newman-reports/newman.xml`) as job summary and artifact. The jest test `tests/integration-collection.test.ts` checks that every operation of `contracts/openapi.json` has a request in the collection and that every request asserts something.
 
