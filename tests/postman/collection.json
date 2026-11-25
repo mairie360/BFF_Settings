@@ -897,7 +897,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"language\": \"fr\",\n  \"timezone\": \"Europe/Paris\",\n  \"date_format\": \"DD/MM/YYYY\",\n  \"home_page\": \"/dashboard\",\n  \"auto_open_notifications\": true\n}",
+              "raw": "{\n  \"language\": \"fr\",\n  \"timezone\": \"Europe/Paris\",\n  \"date_format\": \"DD/MM/YYYY\",\n  \"home_page\": \"/dashboard\",\n  \"auto_open_notifications\": true,\n  \"autosave\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -916,7 +916,7 @@
                   "});",
                   "pm.test(\"Core stored every field\", function () {",
                   "    const body = pm.response.json();",
-                  "    pm.expect(body).to.eql({ language: 'fr', timezone: 'Europe/Paris', date_format: 'DD/MM/YYYY', home_page: '/dashboard', auto_open_notifications: true });",
+                  "    pm.expect(body).to.eql({ language: 'fr', timezone: 'Europe/Paris', date_format: 'DD/MM/YYYY', home_page: '/dashboard', auto_open_notifications: true, autosave: true });",
                   "});"
                 ]
               }
