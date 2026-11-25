@@ -1153,7 +1153,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": true,\n  \"push\": false,\n  \"desktop\": true,\n  \"messages\": true,\n  \"projects\": false,\n  \"calendar\": false\n}",
+              "raw": "{\n  \"email\": true,\n  \"push\": false,\n  \"desktop\": true,\n  \"messages\": true,\n  \"projects\": false,\n  \"calendar\": false,\n  \"system_updates\": false,\n  \"login_alerts\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1175,7 +1175,7 @@
                   "});",
                   "pm.test(\"Core stored every flag\", function () {",
                   "    const body = pm.response.json();",
-                  "    pm.expect(body).to.eql({ email: true, push: false, desktop: true, messages: true, projects: false, calendar: false });",
+                  "    pm.expect(body).to.eql({ email: true, push: false, desktop: true, messages: true, projects: false, calendar: false, system_updates: false, login_alerts: true });",
                   "});"
                 ]
               }
@@ -1274,7 +1274,7 @@
                   "pm.test(\"Notifications are stored next to the preferences\", function () {",
                   "    const body = pm.response.json();",
                   "    pm.expect(body.sources.notifications).to.eql('available');",
-                  "    pm.expect(body.notifications).to.eql({ email: true, push: false, desktop: true, messages: true, projects: true, calendar: false });",
+                  "    pm.expect(body.notifications).to.eql({ email: true, push: false, desktop: true, messages: true, projects: true, calendar: false, system_updates: false, login_alerts: true });",
                   "    pm.expect(body.appearance.theme).to.eql('light');",
                   "});"
                 ]
@@ -1434,7 +1434,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": null,\n  \"push\": null,\n  \"desktop\": null,\n  \"messages\": null,\n  \"projects\": null,\n  \"calendar\": null\n}",
+              "raw": "{\n  \"email\": null,\n  \"push\": null,\n  \"desktop\": null,\n  \"messages\": null,\n  \"projects\": null,\n  \"calendar\": null,\n  \"system_updates\": null,\n  \"login_alerts\": null\n}",
               "options": {
                 "raw": {
                   "language": "json"
