@@ -1016,7 +1016,7 @@
                   "pm.test(\"Appearance and general settings are both stored\", function () {",
                   "    const body = pm.response.json();",
                   "    pm.expect(body.appearance).to.eql({ theme: 'light', font_family: 'atkinson', font_size: 18, density: 'compact' });",
-                  "    pm.expect(body.general).to.eql({ language: 'fr', timezone: 'Europe/Paris', date_format: 'DD/MM/YYYY', home_page: '/dashboard', auto_open_notifications: true });",
+                  "    pm.expect(body.general).to.eql({ language: 'fr', timezone: 'Europe/Paris', date_format: 'DD/MM/YYYY', home_page: '/dashboard', auto_open_notifications: true, autosave: true });",
                   "});"
                 ]
               }

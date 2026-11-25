@@ -82,8 +82,11 @@ services:
       - ./init-test.sql:/init-test.sql:ro
     environment:
       PGPASSWORD: password
+    # The scan accepts passkeys (two-factor policy): POST /settings/passkeys/options must reach Core's challenge, since
+    # the OpenAPI coverage gate refuses an operation that only answered 403. The k6 stack keeps the default policy.
     command: >
-      sh -c "psql -v ON_ERROR_STOP=1 -h postgres -U postgres -d mairie_360_database -f /init-test.sql"
+      sh -c "psql -v ON_ERROR_STOP=1 -h postgres -U postgres -d mairie_360_database -f /init-test.sql
+      && psql -v ON_ERROR_STOP=1 -h postgres -U postgres -d mairie_360_database -c 'UPDATE two_factor_policy SET passkey_allowed = TRUE'"
     networks:
       - backend
 
