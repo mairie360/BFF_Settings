@@ -89,6 +89,18 @@ export class OpenApiContract {
     return { required: Boolean(body?.required), schema: body?.content?.['application/json']?.schema };
   }
 
+  /**
+   * Whether the operation takes a binary body: a non-JSON media type, a `format: binary` string, or the `Blob`
+   * model orval rebuilds for one (its contract loses the media type and keeps `application/json`).
+   */
+  takesBinaryBody(match: MatchedOperation): boolean {
+    const content = match.operation.requestBody?.content ?? {};
+    return Object.entries(content).some(([type, media]) => {
+      const schema = (media as { schema?: JsonSchema })?.schema as { $ref?: string; format?: string } | undefined;
+      return type !== 'application/json' || schema?.$ref === '#/components/schemas/Blob' || schema?.format === 'binary';
+    });
+  }
+
   schema(name: string): JsonSchema {
     const schema = this.document.components?.schemas?.[name];
     if (!schema) throw new Error(`Schéma ${name} absent du contrat ${this.title}`);

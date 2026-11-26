@@ -4,6 +4,9 @@ import encoding from 'k6/encoding';
 import { check, sleep } from 'k6';
 import { createCoverage } from '/coverage.js';
 
+// The smallest WebP Core accepts: `RIFF`, a size, `WEBP`, then a payload.
+const WEBP_PHOTO = new Uint8Array([82, 73, 70, 70, 0, 0, 0, 0, 87, 69, 66, 80, 86, 80, 56, 32, 107, 54]);
+
 // ---------------------------------------------------------------------------
 // k6 load test of the BFF Settings.
 //
@@ -176,6 +179,20 @@ const handlers = {
       'clear phone 200': (r) => r.status === 200 && (json(r) || {}).phone == null,
     });
   },
+  // The profile photo: a WebP (RIFF/WEBP signature) of a few bytes, set, read back, then removed.
+  'PUT /settings/profile/photo': ({ request }) => {
+    check(request({ body: WEBP_PHOTO.buffer, headers: { ...writer().headers, 'Content-Type': 'image/webp' } }), {
+      'set photo 204': (r) => r.status === 204,
+    });
+  },
+  'GET /settings/profile/photo': ({ request }) =>
+    // The writer has no photo before its first upload and between a DELETE and the next PUT.
+    check(request({ headers: writer().headers, params: { responseCallback: http.expectedStatuses(200, 404) } }), {
+      'photo 200 or none': (r) => r.status === 200 || r.status === 404,
+      'photo is a WebP': (r) => r.status !== 200 || String(r.headers['Content-Type']).startsWith('image/webp'),
+    }),
+  'DELETE /settings/profile/photo': ({ request }) =>
+    check(request({ headers: writer().headers }), { 'remove photo 204': (r) => r.status === 204 }),
   'PATCH /settings/notifications': preferenceHandler('notifications', { system_updates: true }),
   'PATCH /settings/appearance': preferenceHandler('appearance', { font_family: 'atkinson' }),
   'PATCH /settings/general': preferenceHandler('general', { autosave: true }),
@@ -331,6 +348,7 @@ export function reads() {
   for (const operation of readOperations) {
     const request = (call = {}) =>
       http.get(coverage.url(operation.op, call.path, call.query), {
+        ...(call.params || {}),
         headers: call.headers || {},
         tags: { op: operation.op },
       });

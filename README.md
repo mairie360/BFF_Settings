@@ -47,6 +47,7 @@ Generated contract: [`contracts/openapi.json`](contracts/openapi.json) (7 operat
 | `GET` | `/check_apis` | Checks that the upstream APIs are reachable |
 | `GET` | `/settings/bootstrap` | Load the settings page of the signed-in user |
 | `PATCH` | `/settings/profile` | Update the profile of the signed-in user |
+| `PUT` / `GET` / `DELETE` | `/settings/profile/photo` | Set, read or remove the photo of the signed-in user (WebP, 100 KiB) |
 | `PATCH` | `/settings/appearance` | Save the appearance settings of the signed-in user |
 | `PATCH` | `/settings/general` | Save the general settings of the signed-in user |
 | `PATCH` | `/settings/notifications` | Save the notifications settings of the signed-in user |

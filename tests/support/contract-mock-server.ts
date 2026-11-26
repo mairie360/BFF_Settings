@@ -17,13 +17,15 @@ export type RecordedRequest = {
   headers: IncomingHttpHeaders;
   undeclaredQuery: string[];
   body?: unknown;
+  /** Raw bytes of a binary body (an image), never parsed. */
+  bytes?: Buffer;
 };
 
 export type MockReply = {
   status?: number;
   body?: unknown;
-  /** Corps brut envoyé tel quel (ex. JSON invalide, text/plain). */
-  raw?: string;
+  /** Raw body sent as is (invalid JSON, text/plain, an image). */
+  raw?: string | Buffer;
   contentType?: string;
   /** En-têtes de réponse supplémentaires (ex. `Authorization` renvoyé par un login). */
   headers?: Record<string, string>;
@@ -134,26 +136,33 @@ export class ContractMockServer {
   private async answer(req: http.IncomingMessage, res: http.ServerResponse) {
     const method = req.method ?? 'GET';
     const url = new URL(req.url ?? '/', this.url);
-    const rawBody = await readBody(req);
+    const bytes = await readBody(req);
     const path = this.contractPath(url.pathname);
     const { match, errors, undeclaredQuery } = path === undefined
       ? { match: undefined, errors: [`hors du préfixe ${this.options.basePath}`], undeclaredQuery: [] }
       : this.contract.validateRequest(method, new URL(`${path}${url.search}`, this.url));
     errors.forEach((error) => this.violation(`[${this.service}] requête ${method} ${url.pathname}${url.search} : ${error}`));
     if (!match || path === undefined) return send(res, 404, JSON.stringify({ error: { message: 'Route absente du contrat' } }));
+    // A body is kept as bytes only when the operation declares a binary one (an image upload) and the request
+    // sends a binary type; any other body is read, and checked, as JSON.
+    const binaryDeclared = this.contract.takesBinaryBody(match);
+    const binary = binaryDeclared && /^(image\/|application\/octet-stream)/.test(req.headers['content-type'] ?? '');
+    if (binaryDeclared && bytes.length && !binary) this.violation(`[${this.service}] requête ${method} ${match.template} : corps binaire attendu, reçu ${req.headers['content-type'] ?? 'sans type'}`);
+    const rawBody = binaryDeclared ? '' : bytes.toString('utf8');
 
     let body: unknown;
     const { required, schema: bodySchema } = this.contract.requestBodySchema(match);
     if (rawBody) {
       try { body = JSON.parse(rawBody); } catch { this.violation(`[${this.service}] requête ${method} ${match.template} : corps JSON invalide`); }
-    } else if (required) {
+    } else if (required && !binaryDeclared) {
       this.violation(`[${this.service}] requête ${method} ${match.template} : corps requis manquant`);
     }
     if (bodySchema && body !== undefined) {
       this.contract.validate(bodySchema, body, '$body').forEach((error) => this.violation(`[${this.service}] requête ${method} ${match.template} ${error}`));
     }
 
-    const request: RecordedRequest = { method, url, path, template: match.template, pathParams: match.pathParams, headers: req.headers, undeclaredQuery, body };
+    if (binaryDeclared && !bytes.length && required) this.violation(`[${this.service}] requête ${method} ${match.template} : corps requis manquant`);
+    const request: RecordedRequest = { method, url, path, template: match.template, pathParams: match.pathParams, headers: req.headers, undeclaredQuery, body, ...(binary ? { bytes } : {}) };
     this.requests.push(request);
     const handler = this.handlers.get(`${method} ${match.template}`);
     if (!handler) {
@@ -177,16 +186,16 @@ export class ContractMockServer {
   }
 }
 
-function readBody(req: http.IncomingMessage): Promise<string> {
+function readBody(req: http.IncomingMessage): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     req.on('data', (chunk: Buffer) => chunks.push(chunk));
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
     req.on('error', reject);
   });
 }
 
-function send(res: http.ServerResponse, status: number, payload: string, contentType = 'application/json', headers: Record<string, string> = {}) {
+function send(res: http.ServerResponse, status: number, payload: string | Buffer, contentType = 'application/json', headers: Record<string, string> = {}) {
   if (res.headersSent) return;
   res.writeHead(status, { ...(payload ? { 'Content-Type': contentType } : {}), ...headers });
   res.end(payload);

@@ -71,6 +71,9 @@ Inventaire extrait de `contracts/openapi.json`. Les paramètres entre accolades 
 | GET | `/check_apis` | — | 200, 502 |
 | GET | `/settings/bootstrap` | — | 200, 401, 502, 503 |
 | PATCH | `/settings/profile` | application/json | 200, 400, 401, 403, 409, 429, 502, 503 |
+| PUT | `/settings/profile/photo` | image/webp | 204, 400, 401, 413, 429, 502, 503 |
+| GET | `/settings/profile/photo` | — | 200 (image/webp), 404, 401, 429, 502, 503 |
+| DELETE | `/settings/profile/photo` | — | 204, 401, 429, 502, 503 |
 | PATCH | `/settings/notifications` | application/json | 200, 400, 401, 502, 503 |
 | PATCH | `/settings/appearance` | application/json | 200, 400, 401, 502, 503 |
 | PATCH | `/settings/general` | application/json | 200, 400, 401, 502, 503 |

@@ -347,6 +347,223 @@ export interface paths {
         };
         trace?: never;
     };
+    "/settings/profile/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the photo of the signed-in user */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The photo (WebP) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/webp": string;
+                    };
+                };
+                /** @description Missing, forged or expired session token, or a session Core refuses */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description The user has no photo */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core is unavailable, failed or answered an unexpected status */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core or the session key (JWT_PUBLIC_KEY) is not configured */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        /** Set the photo of the signed-in user */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "image/webp": string;
+                };
+            };
+            responses: {
+                /** @description Photo stored; the profile now answers `has_photo: true` */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The body is empty or not a WebP image */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Missing, forged or expired session token, or a session Core refuses */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description The image is larger than 102400 bytes */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core is unavailable, failed or answered an unexpected status */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core or the session key (JWT_PUBLIC_KEY) is not configured */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /** Remove the photo of the signed-in user */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No photo left (whether there was one or not) */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Missing, forged or expired session token, or a session Core refuses */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core rate limit reached: retry after the Retry-After header (seconds) */
+                429: {
+                    headers: {
+                        /** @description Seconds to wait before retrying */
+                        "Retry-After"?: number;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core is unavailable, failed or answered an unexpected status */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Core or the session key (JWT_PUBLIC_KEY) is not configured */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/appearance": {
         parameters: {
             query?: never;
@@ -1729,6 +1946,29 @@ export interface components {
              * @example security-admin@nouvelle-adresse.fr
              */
             pending_email?: string | null;
+            /**
+             * @description Biography written by the user, plain text with line breaks; `null` when empty
+             * @example Roads department agent since 2018.
+             */
+            biography?: string | null;
+            /**
+             * @description Function (job title) of the user; `null` when empty
+             * @example Head of the roads department
+             */
+            job_title?: string | null;
+            /**
+             * @description Whether the user stored a photo, read with `GET /settings/profile/photo`
+             * @default false
+             * @example false
+             */
+            has_photo: boolean;
+            /** @description Service of the mairie the administration attached the user to (read-only); `null` when none */
+            service?: {
+                /** @example 3 */
+                id: number;
+                /** @example Roads */
+                name: string;
+            } | null;
         };
         SettingsProfilePatch: {
             /** @example Security */
@@ -1749,6 +1989,16 @@ export interface components {
              * @example current-password
              */
             current_password?: string;
+            /**
+             * @description Biography, plain text with line breaks, 1000 characters at most; `null` or blank removes it
+             * @example Roads department agent since 2018.
+             */
+            biography?: string | null;
+            /**
+             * @description Function (job title), one line of 100 characters at most; `null` or blank removes it
+             * @example Head of the roads department
+             */
+            job_title?: string | null;
         };
         SettingsSession: {
             id: string;

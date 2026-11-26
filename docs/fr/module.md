@@ -19,7 +19,7 @@ Domaine fonctionnel: Paramètres personnels.
 ## Parcours type
 
 1. Charger `/settings/bootstrap`.
-2. Modifier les coordonnées et transmettre `/settings/profile`.
+2. Modifier les coordonnées, la fonction et la bio et transmettre `/settings/profile` ; le service, défini par l’administration, est en lecture seule. La photo (un WebP de 100 Ko au plus, recadré en 256 × 256 par le front) est enregistrée, lue et retirée par `/settings/profile/photo`.
 3. Afficher le profil relu depuis Core et consulter les sessions disponibles.
 
 ## Place dans Mairie360

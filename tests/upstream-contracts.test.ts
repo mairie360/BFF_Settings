@@ -67,7 +67,7 @@ describe('Core API contract from the installed @mairie360/core-api-openapi packa
     const getMe = coreApi.match('GET', coreApiUrls.getGetMeUrl())!;
     expect(getMe.operation.parameters).toEqual([]);
     expect(coreApi.responseSchema(getMe, 200)).toEqual({ documented: true, schema: { $ref: '#/components/schemas/GetMeResponseView' } });
-    expect(coreApi.schema('GetMeResponseView')).toMatchObject({ required: ['email', 'first_name', 'groups', 'last_name', 'modules', 'role', 'roles', 'status'] });
+    expect(coreApi.schema('GetMeResponseView')).toMatchObject({ required: ['email', 'first_name', 'groups', 'has_photo', 'last_name', 'modules', 'role', 'roles', 'status'] });
 
     const patch = coreApi.match('PATCH', coreApiUrls.getPatchMeUrl())!;
     expect(coreApi.requestBodySchema(patch)).toEqual({ required: true, schema: { $ref: '#/components/schemas/PatchMeView' } });

@@ -23,7 +23,7 @@
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@mairie360/calendar-api-openapi": "0.0.0-dev-49ebaf5",
-    "@mairie360/core-api-openapi": "0.0.0-dev-89f2e16",
+    "@mairie360/core-api-openapi": "0.0.0-dev-cadb518",
     "@mairie360/elearning-api-openapi": "0.0.0-dev-7962af7",
     "@mairie360/message-api-openapi": "0.0.0-dev-e198ff1",
     "@mairie360/project-api-openapi": "0.0.0-dev-dee314a",

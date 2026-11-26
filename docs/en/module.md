@@ -19,7 +19,7 @@ Business domain: Personal settings.
 ## Typical workflow
 
 1. Load `/settings/bootstrap`.
-2. Edit contact details and submit `/settings/profile`.
+2. Edit contact details, the function and the biography and submit `/settings/profile`; the service, set by the administration, is read-only. The photo (a WebP of at most 100 KiB the front crops to 256 × 256) is set, read and removed through `/settings/profile/photo`.
 3. Display the profile read back from Core and inspect available sessions.
 
 ## Role within Mairie360
