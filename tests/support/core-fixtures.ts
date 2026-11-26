@@ -29,17 +29,22 @@ export function meResponse(overrides: Partial<GetMeResponseView> = {}): GetMeRes
     status: 'active',
     groups: [group(1, { name: 'Service urbanisme' })],
     modules: ['dashboard', 'settings'],
+    has_photo: false,
     ...overrides,
   };
 }
 
 /** Profil attendu en sortie du BFF pour un corps `GET /api/v1/user/me/`. */
-export function profileOf(me: GetMeResponseView): Pick<GetMeResponseView, 'first_name' | 'last_name' | 'email' | 'phone' | 'phone_country' | 'pending_email'> {
-  const { first_name, last_name, email, phone, phone_country, pending_email } = me;
+export function profileOf(me: GetMeResponseView) {
+  const { first_name, last_name, email, phone, phone_country, pending_email, biography, job_title, has_photo, service } = me;
   return {
     first_name, last_name, email, phone,
     ...(phone_country === undefined ? {} : { phone_country }),
     ...(pending_email === undefined ? {} : { pending_email }),
+    ...(biography === undefined ? {} : { biography }),
+    ...(job_title === undefined ? {} : { job_title }),
+    has_photo,
+    ...(service === undefined ? {} : { service }),
   };
 }
 

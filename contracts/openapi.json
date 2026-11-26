@@ -228,6 +228,49 @@
             "format": "email",
             "description": "New e-mail address waiting for its confirmation link (valid one hour); `email` stays the current address until then. Absent or `null` when there is none",
             "example": "security-admin@nouvelle-adresse.fr"
+          },
+          "biography": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Biography written by the user, plain text with line breaks; `null` when empty",
+            "example": "Roads department agent since 2018."
+          },
+          "job_title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Function (job title) of the user; `null` when empty",
+            "example": "Head of the roads department"
+          },
+          "has_photo": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether the user stored a photo, read with `GET /settings/profile/photo`",
+            "example": false
+          },
+          "service": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "example": 3
+              },
+              "name": {
+                "type": "string",
+                "example": "Roads"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "Service of the mairie the administration attached the user to (read-only); `null` when none"
           }
         },
         "required": [
@@ -282,6 +325,25 @@
             "maxLength": 255,
             "description": "Current password of the account, required when `email` changes the current address",
             "example": "current-password"
+          },
+          "biography": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000,
+            "description": "Biography, plain text with line breaks, 1000 characters at most; `null` or blank removes it",
+            "example": "Roads department agent since 2018."
+          },
+          "job_title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100,
+            "pattern": "^[^\\r\\n]*$",
+            "description": "Function (job title), one line of 100 characters at most; `null` or blank removes it",
+            "example": "Head of the roads department"
           }
         },
         "additionalProperties": false
@@ -1309,6 +1371,225 @@
           },
           "409": {
             "description": "`email` is already used by another account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Core is unavailable, failed or answered an unexpected status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core or the session key (JWT_PUBLIC_KEY) is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings/profile/photo": {
+      "put": {
+        "summary": "Set the photo of the signed-in user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Photo stored; the profile now answers `has_photo: true`"
+          },
+          "400": {
+            "description": "The body is empty or not a WebP image",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The image is larger than 102400 bytes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Core is unavailable, failed or answered an unexpected status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core or the session key (JWT_PUBLIC_KEY) is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Read the photo of the signed-in user",
+        "responses": {
+          "200": {
+            "description": "The photo (WebP)",
+            "content": {
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, forged or expired session token, or a session Core refuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The user has no photo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Core rate limit reached: retry after the Retry-After header (seconds)",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Core is unavailable, failed or answered an unexpected status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Core or the session key (JWT_PUBLIC_KEY) is not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove the photo of the signed-in user",
+        "responses": {
+          "204": {
+            "description": "No photo left (whether there was one or not)"
+          },
+          "401": {
+            "description": "Missing, forged or expired session token, or a session Core refuses",
             "content": {
               "application/json": {
                 "schema": {

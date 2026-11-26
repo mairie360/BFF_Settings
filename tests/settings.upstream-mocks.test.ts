@@ -236,7 +236,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(missingPhone.status).toBe(200);
       expectBffContract('get', '/settings/bootstrap', missingPhone);
       expect(missingPhone.body).toEqual({
-        profile: { first_name: me.first_name, last_name: me.last_name, email: me.email }, sessions: [], ...BOOT, ...STORED, sources: ALL_AVAILABLE,
+        profile: { first_name: me.first_name, last_name: me.last_name, email: me.email, has_photo: false }, sessions: [], ...BOOT, ...STORED, sources: ALL_AVAILABLE,
       });
     });
 
@@ -619,7 +619,7 @@ describe('BFF Settings with a contract-driven Core API mock', () => {
       expect(response.status).toBe(400);
       expectBffContract('patch', '/settings/profile', response);
       expect(response.body).toEqual({ error: { code: 'BAD_REQUEST', message: 'Validation failed', details: [
-        { path: 'body', message: 'Expected at least one of first_name, last_name, email, phone, phone_country' },
+        { path: 'body', message: 'Expected at least one of first_name, last_name, email, phone, phone_country, biography, job_title' },
       ] } });
       expect(coreApi.requests).toHaveLength(0);
     });

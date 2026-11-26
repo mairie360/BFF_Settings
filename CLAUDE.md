@@ -77,6 +77,13 @@ genuine one. Tests sign their tokens with EdDSA like Core (`sessionToken`, `bear
     to `null`). Session objects are re-parsed through a Zod schema, which strips internal fields like `token_hash`.
   - The profile carries `phone` (E.164, as Core answers it) and `phone_country`. A patch forwards the phone as
     typed (Core MAIR-480 parses it against `phone_country`, or its `+` prefix, and clears it on `null`/`""`).
+  - The profile also carries `biography`, `job_title` (both `null` when empty), `has_photo` and the read-only
+    `service` (`{id, name}` set by the administration in Core, `null` when none); the patch accepts `biography`
+    (1000 characters) and `job_title` (one line, 100 characters), `null` or blank removes them (Core trims).
+    `PUT` / `GET` / `DELETE /settings/profile/photo` relay the photo to Core as raw bytes: `express.raw` on the
+    route only, limit 100 KiB (413 before Core), an empty body is a 400, Core checks the WebP signature (400)
+    and answers 404 when there is none; `GET` serves `image/webp` with `no-store`. The fronts crop and compress
+    the photo first. `tests/support/contract-mock-server.ts` keeps an `image/*` body as `bytes`, never parsed.
   - `PATCH /settings/profile` validates with the lib's `parseRequest(ProfilePatchSchema, req.body, 'body')`
     (`.strict()`: unknown fields are a 400 `Validation failed` with `body.<field>` details) and refuses an
     empty patch with the same 400 (never a silent success), PATCHes Core, then **re-reads** and returns the

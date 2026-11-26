@@ -58,7 +58,7 @@ describe('MAIR-1231 profile details', () => {
     expect(response.body.profile).toMatchObject({ biography: 'Voirie.\nAstreinte le lundi.', job_title: 'Chef de service', has_photo: true, service: { id: 3, name: 'Voirie' } });
   });
 
-  it('MAIR-1231 a Core without these fields yet reads as an empty profile, without a photo', async () => {
+  it('MAIR-1231 an agent without details reads as an empty profile, without a photo', async () => {
     coreApi.on('get', CORE.me, { body: meResponse() });
 
     const response = await signedIn(request(app).get('/settings/bootstrap'));

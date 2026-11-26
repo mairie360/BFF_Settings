@@ -310,7 +310,7 @@ router.put('/profile/photo', photoBody, async (req, res) => {
   const photo = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
   if (!photo.length) throw validationError('body', [{ path: [], message: 'Expected a WebP image' }]);
   // Not retried: only idempotent reads are.
-  await callUpstream('CORE_API', () => coreApi.setMyPhoto(new Blob([photo]), callerWith(req, { headers: { 'Content-Type': 'image/webp' } })), {
+  await callUpstream('CORE_API', () => coreApi.setMyPhoto(new Blob([new Uint8Array(photo)], { type: 'image/webp' }), callerWith(req, { headers: { 'Content-Type': 'image/webp' } })), {
     declared: [400, 401, 413],
   });
   return res.status(204).end();
