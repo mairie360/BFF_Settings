@@ -186,7 +186,8 @@ const handlers = {
     });
   },
   'GET /settings/profile/photo': ({ request }) =>
-    check(request({ headers: writer().headers }), {
+    // The writer has no photo before its first upload and between a DELETE and the next PUT.
+    check(request({ headers: writer().headers, params: { responseCallback: http.expectedStatuses(200, 404) } }), {
       'photo 200 or none': (r) => r.status === 200 || r.status === 404,
       'photo is a WebP': (r) => r.status !== 200 || String(r.headers['Content-Type']).startsWith('image/webp'),
     }),
@@ -347,6 +348,7 @@ export function reads() {
   for (const operation of readOperations) {
     const request = (call = {}) =>
       http.get(coverage.url(operation.op, call.path, call.query), {
+        ...(call.params || {}),
         headers: call.headers || {},
         tags: { op: operation.op },
       });

@@ -167,3 +167,14 @@ describe('MAIR-1231 profile photo', () => {
     expect(coreApi.requests).toEqual([]);
   });
 });
+
+describe('MAIR-1231 contract mock and binary bodies', () => {
+  it('MAIR-1231 reads image bytes sent to a JSON operation as JSON, so they are reported', async () => {
+    coreApi.on('patch', CORE.me, { status: 200 });
+
+    await fetch(new URL(CORE.me, coreApi.url), { method: 'PATCH', headers: { 'Content-Type': 'image/webp' }, body: new Uint8Array(WEBP) });
+
+    expect(coreApi.violations).toEqual([expect.stringContaining('corps JSON invalide')]);
+    coreApi.violations.length = 0;
+  });
+});

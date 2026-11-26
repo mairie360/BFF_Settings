@@ -137,28 +137,31 @@ export class ContractMockServer {
     const method = req.method ?? 'GET';
     const url = new URL(req.url ?? '/', this.url);
     const bytes = await readBody(req);
-    // A binary request body (an image) is kept as bytes; any other body is read as JSON.
-    const binary = /^(image|application\/octet-stream)/.test(req.headers['content-type'] ?? '');
-    const rawBody = binary ? '' : bytes.toString('utf8');
     const path = this.contractPath(url.pathname);
     const { match, errors, undeclaredQuery } = path === undefined
       ? { match: undefined, errors: [`hors du préfixe ${this.options.basePath}`], undeclaredQuery: [] }
       : this.contract.validateRequest(method, new URL(`${path}${url.search}`, this.url));
     errors.forEach((error) => this.violation(`[${this.service}] requête ${method} ${url.pathname}${url.search} : ${error}`));
     if (!match || path === undefined) return send(res, 404, JSON.stringify({ error: { message: 'Route absente du contrat' } }));
+    // A body is kept as bytes only when the operation declares a binary one (an image upload) and the request
+    // sends a binary type; any other body is read, and checked, as JSON.
+    const binaryDeclared = this.contract.takesBinaryBody(match);
+    const binary = binaryDeclared && /^(image\/|application\/octet-stream)/.test(req.headers['content-type'] ?? '');
+    if (binaryDeclared && bytes.length && !binary) this.violation(`[${this.service}] requête ${method} ${match.template} : corps binaire attendu, reçu ${req.headers['content-type'] ?? 'sans type'}`);
+    const rawBody = binaryDeclared ? '' : bytes.toString('utf8');
 
     let body: unknown;
     const { required, schema: bodySchema } = this.contract.requestBodySchema(match);
     if (rawBody) {
       try { body = JSON.parse(rawBody); } catch { this.violation(`[${this.service}] requête ${method} ${match.template} : corps JSON invalide`); }
-    } else if (required && !binary) {
+    } else if (required && !binaryDeclared) {
       this.violation(`[${this.service}] requête ${method} ${match.template} : corps requis manquant`);
     }
     if (bodySchema && body !== undefined) {
       this.contract.validate(bodySchema, body, '$body').forEach((error) => this.violation(`[${this.service}] requête ${method} ${match.template} ${error}`));
     }
 
-    if (binary && !bytes.length && required) this.violation(`[${this.service}] requête ${method} ${match.template} : corps requis manquant`);
+    if (binaryDeclared && !bytes.length && required) this.violation(`[${this.service}] requête ${method} ${match.template} : corps requis manquant`);
     const request: RecordedRequest = { method, url, path, template: match.template, pathParams: match.pathParams, headers: req.headers, undeclaredQuery, body, ...(binary ? { bytes } : {}) };
     this.requests.push(request);
     const handler = this.handlers.get(`${method} ${match.template}`);
