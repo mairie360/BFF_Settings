@@ -17,13 +17,15 @@ export type RecordedRequest = {
   headers: IncomingHttpHeaders;
   undeclaredQuery: string[];
   body?: unknown;
+  /** Raw bytes of a binary body (an image), never parsed. */
+  bytes?: Buffer;
 };
 
 export type MockReply = {
   status?: number;
   body?: unknown;
-  /** Corps brut envoyé tel quel (ex. JSON invalide, text/plain). */
-  raw?: string;
+  /** Raw body sent as is (invalid JSON, text/plain, an image). */
+  raw?: string | Buffer;
   contentType?: string;
   /** En-têtes de réponse supplémentaires (ex. `Authorization` renvoyé par un login). */
   headers?: Record<string, string>;
@@ -134,7 +136,10 @@ export class ContractMockServer {
   private async answer(req: http.IncomingMessage, res: http.ServerResponse) {
     const method = req.method ?? 'GET';
     const url = new URL(req.url ?? '/', this.url);
-    const rawBody = await readBody(req);
+    const bytes = await readBody(req);
+    // A binary request body (an image) is kept as bytes; any other body is read as JSON.
+    const binary = /^(image|application\/octet-stream)/.test(req.headers['content-type'] ?? '');
+    const rawBody = binary ? '' : bytes.toString('utf8');
     const path = this.contractPath(url.pathname);
     const { match, errors, undeclaredQuery } = path === undefined
       ? { match: undefined, errors: [`hors du préfixe ${this.options.basePath}`], undeclaredQuery: [] }
@@ -146,14 +151,15 @@ export class ContractMockServer {
     const { required, schema: bodySchema } = this.contract.requestBodySchema(match);
     if (rawBody) {
       try { body = JSON.parse(rawBody); } catch { this.violation(`[${this.service}] requête ${method} ${match.template} : corps JSON invalide`); }
-    } else if (required) {
+    } else if (required && !binary) {
       this.violation(`[${this.service}] requête ${method} ${match.template} : corps requis manquant`);
     }
     if (bodySchema && body !== undefined) {
       this.contract.validate(bodySchema, body, '$body').forEach((error) => this.violation(`[${this.service}] requête ${method} ${match.template} ${error}`));
     }
 
-    const request: RecordedRequest = { method, url, path, template: match.template, pathParams: match.pathParams, headers: req.headers, undeclaredQuery, body };
+    if (binary && !bytes.length && required) this.violation(`[${this.service}] requête ${method} ${match.template} : corps requis manquant`);
+    const request: RecordedRequest = { method, url, path, template: match.template, pathParams: match.pathParams, headers: req.headers, undeclaredQuery, body, ...(binary ? { bytes } : {}) };
     this.requests.push(request);
     const handler = this.handlers.get(`${method} ${match.template}`);
     if (!handler) {
@@ -177,16 +183,16 @@ export class ContractMockServer {
   }
 }
 
-function readBody(req: http.IncomingMessage): Promise<string> {
+function readBody(req: http.IncomingMessage): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     req.on('data', (chunk: Buffer) => chunks.push(chunk));
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
     req.on('error', reject);
   });
 }
 
-function send(res: http.ServerResponse, status: number, payload: string, contentType = 'application/json', headers: Record<string, string> = {}) {
+function send(res: http.ServerResponse, status: number, payload: string | Buffer, contentType = 'application/json', headers: Record<string, string> = {}) {
   if (res.headersSent) return;
   res.writeHead(status, { ...(payload ? { 'Content-Type': contentType } : {}), ...headers });
   res.end(payload);

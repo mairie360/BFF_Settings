@@ -1,5 +1,5 @@
-import { asCaller, bearerToken, callUpstream, parseRequest, requireSession, validationError } from '@mairie360/bffs-lib';
-import { Router, type Request } from 'express';
+import { HttpError, asCaller, bearerToken, callUpstream, parseRequest, requireSession, validationError } from '@mairie360/bffs-lib';
+import express, { Router, type Request } from 'express';
 import { z } from 'zod';
 import { registry, ErrorSchema } from '../openapi-registry';
 import type { PatchMeView } from '@mairie360/core-api-openapi/model';
@@ -37,6 +37,17 @@ export const ProfileSchema = registry.register('SettingsProfile', z.object({
     description: 'New e-mail address waiting for its confirmation link (valid one hour); `email` stays the current address until then. Absent or `null` when there is none',
     example: 'security-admin@nouvelle-adresse.fr',
   }),
+  // Profile details of the Settings mockup, from Core's GET /user/me.
+  biography: z.string().nullable().optional().openapi({
+    description: 'Biography written by the user, plain text with line breaks; `null` when empty',
+    example: 'Roads department agent since 2018.',
+  }),
+  job_title: z.string().nullable().optional().openapi({ description: 'Function (job title) of the user; `null` when empty', example: 'Head of the roads department' }),
+  has_photo: z.boolean().default(false).openapi({ description: 'Whether the user stored a photo, read with `GET /settings/profile/photo`', example: false }),
+  service: z.object({
+    id: z.number().int().openapi({ example: 3 }),
+    name: z.string().openapi({ example: 'Roads' }),
+  }).nullable().optional().openapi({ description: 'Service of the mairie the administration attached the user to (read-only); `null` when none' }),
 }));
 // Edits follow the database columns (names up to 64 characters, phone up to 15): a longer value made
 // Core API 1.2.0 fail with a 500 (Core 2.0 enforces the same limits with a 400). Names are rendered by the fronts, so `<`
@@ -63,8 +74,17 @@ export const ProfilePatchSchema = registry.register('SettingsProfilePatch', z.ob
     description: 'Current password of the account, required when `email` changes the current address',
     example: 'current-password',
   }),
+  // Plain texts, stored trimmed by Core; `null` or a blank text removes them. Same limits as Core.
+  biography: z.string().max(1000).nullable().openapi({
+    description: 'Biography, plain text with line breaks, 1000 characters at most; `null` or blank removes it',
+    example: 'Roads department agent since 2018.',
+  }),
+  job_title: z.string().max(100).regex(/^[^\r\n]*$/, 'Must fit on one line').nullable().openapi({
+    description: 'Function (job title), one line of 100 characters at most; `null` or blank removes it',
+    example: 'Head of the roads department',
+  }),
 }).partial().strict());
-const PROFILE_FIELDS = ['first_name', 'last_name', 'email', 'phone', 'phone_country'] as const;
+const PROFILE_FIELDS = ['first_name', 'last_name', 'email', 'phone', 'phone_country', 'biography', 'job_title'] as const;
 const SessionSchema = registry.register('SettingsSession', z.object({
   id: z.string(), device_info: z.string(), ip_address: z.string(), created_at: z.string(), expires_at: z.string(), revoked_at: z.string().nullable().optional(),
 }));
@@ -244,7 +264,7 @@ router.patch('/profile', async (req, res) => {
   const body = parseRequest(ProfilePatchSchema, req.body, 'body');
   // An empty patch is refused instead of answering a save that changed nothing.
   if (!PROFILE_FIELDS.some((field) => field in body)) {
-    throw validationError('body', [{ path: [], message: 'Expected at least one of first_name, last_name, email, phone, phone_country' }]);
+    throw validationError('body', [{ path: [], message: `Expected at least one of ${PROFILE_FIELDS.join(', ')}` }]);
   }
   // The settings form always sends the whole profile: an e-mail equal to the current one (trimmed,
   // case-insensitive) is not a change and is not sent to Core, so it needs no current password.
@@ -265,6 +285,58 @@ router.patch('/profile', async (req, res) => {
   // Not retried: only idempotent reads are.
   await callUpstream('CORE_API', () => coreApi.patchMe(patch, asCaller('CORE_API', req)), { declared: [400, 401, 403, 409] });
   return res.json(await readProfile(req));
+});
+
+// The profile photo: a WebP of at most 100 KiB the front crops to 256 x 256. Core checks the format and the size
+// (400 / 413); the body parser refuses a larger body with a 413 before any Core call.
+export const MAX_PHOTO_BYTES = 100 * 1024;
+const photoBody = express.raw({ type: () => true, limit: MAX_PHOTO_BYTES });
+const PhotoSchema = z.string().openapi({ type: 'string', format: 'binary' });
+/** Options of a Core call as the caller, with extra axios options. */
+const callerWith = (req: Request, extra: { headers?: Record<string, string>; responseType?: 'arraybuffer' }) => {
+  const caller = asCaller('CORE_API', req);
+  return { ...caller, ...extra, headers: { ...caller.headers, ...extra.headers } };
+};
+
+registry.registerPath({ method: 'put', path: '/settings/profile/photo', summary: 'Set the photo of the signed-in user', request: {
+  body: { required: true, content: { 'image/webp': { schema: PhotoSchema } } },
+}, responses: {
+  204: { description: 'Photo stored; the profile now answers `has_photo: true`' },
+  400: { description: 'The body is empty or not a WebP image', ...errorContent },
+  413: { description: 'The image is larger than 102400 bytes', ...errorContent },
+  ...upstreamErrors,
+} });
+router.put('/profile/photo', photoBody, async (req, res) => {
+  const photo = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+  if (!photo.length) throw validationError('body', [{ path: [], message: 'Expected a WebP image' }]);
+  // Not retried: only idempotent reads are.
+  await callUpstream('CORE_API', () => coreApi.setMyPhoto(new Blob([photo]), callerWith(req, { headers: { 'Content-Type': 'image/webp' } })), {
+    declared: [400, 401, 413],
+  });
+  return res.status(204).end();
+});
+
+registry.registerPath({ method: 'get', path: '/settings/profile/photo', summary: 'Read the photo of the signed-in user', responses: {
+  200: { description: 'The photo (WebP)', content: { 'image/webp': { schema: PhotoSchema } } },
+  404: { description: 'The user has no photo', ...errorContent },
+  ...upstreamErrors,
+} });
+router.get('/profile/photo', async (req, res) => {
+  const answer = await callUpstream('CORE_API', () => coreApi.getMyPhoto(callerWith(req, { responseType: 'arraybuffer' })), {
+    declared: [401, 404], retry: true,
+  });
+  const photo = Buffer.from(answer.data as unknown as ArrayBuffer);
+  if (!photo.length) throw new HttpError(502, 'The CORE_API answer is invalid.');
+  return res.type('image/webp').send(photo);
+});
+
+registry.registerPath({ method: 'delete', path: '/settings/profile/photo', summary: 'Remove the photo of the signed-in user', responses: {
+  204: { description: 'No photo left (whether there was one or not)' },
+  ...upstreamErrors,
+} });
+router.delete('/profile/photo', async (req, res) => {
+  await callUpstream('CORE_API', () => coreApi.deleteMyPhoto(asCaller('CORE_API', req)), { declared: [401] });
+  return res.status(204).end();
 });
 
 // Preference sections: each one only accepts its own fields (unknown field: 400, at least one field),
