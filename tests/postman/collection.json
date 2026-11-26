@@ -4407,18 +4407,18 @@
                   "    pm.expect(pm.response.headers.get('Cache-Control')).to.eql('no-store');",
                   "});",
                   "const body = pm.response.json();",
-                  "pm.test(\"An agent whose name holds the term, with the contract shape\", function () {",
+                  "pm.test(\"The administrator is found by its id, with the contract shape\", function () {",
                   "    const group = body.groups.find((entry) => entry.module === 'agents');",
                   "    pm.expect(group, 'agents group').to.be.an('object');",
-                  "    const term = pm.environment.get('search_term').toLowerCase();",
-                  "    const item = group.items.find((entry) => entry.kind === 'agent' && entry.title.toLowerCase().includes(term));",
+                  "    const adminId = Number(pm.environment.get('admin_user_id'));",
+                  "    const item = group.items.find((entry) => entry.kind === 'agent' && entry.id === adminId);",
                   "    pm.expect(item, 'the administrator').to.be.an('object');",
-                  "    pm.expect(item.id).to.be.a('number');",
+                  "    pm.expect(item.title.toLowerCase()).to.include(pm.environment.get('search_term').toLowerCase());",
                   "    pm.expect(item).to.have.property('excerpt');",
                   "});",
                   "pm.test(\"The modules whose API this stack does not run are unavailable, not an error\", function () {",
                   "    pm.expect(body.unavailable).to.include.members([\"projects\", \"calendar\", \"messages\", \"elearning\"]);",
-                  "    pm.expect(body.unavailable).to.not.include.members([\"agents\"]);",
+                  "    pm.expect(body.unavailable).to.not.include('agents');",
                   "});"
                 ]
               }
