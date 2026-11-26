@@ -67,7 +67,7 @@ describe('Core API contract from the installed @mairie360/core-api-openapi packa
     const getMe = coreApi.match('GET', coreApiUrls.getGetMeUrl())!;
     expect(getMe.operation.parameters).toEqual([]);
     expect(coreApi.responseSchema(getMe, 200)).toEqual({ documented: true, schema: { $ref: '#/components/schemas/GetMeResponseView' } });
-    expect(coreApi.schema('GetMeResponseView')).toMatchObject({ required: ['email', 'first_name', 'groups', 'last_name', 'role', 'roles', 'status'] });
+    expect(coreApi.schema('GetMeResponseView')).toMatchObject({ required: ['email', 'first_name', 'groups', 'last_name', 'modules', 'role', 'roles', 'status'] });
 
     const patch = coreApi.match('PATCH', coreApiUrls.getPatchMeUrl())!;
     expect(coreApi.requestBodySchema(patch)).toEqual({ required: true, schema: { $ref: '#/components/schemas/PatchMeView' } });
@@ -113,8 +113,10 @@ describe('preference operations consumed by the BFF', () => {
 
   test('appearance and general split exactly the Core preferences, editable and stored', () => {
     const sections = [...Object.keys(AppearancePatchSchema.shape), ...Object.keys(GeneralPatchSchema.shape)].sort();
-    expect(sections).toEqual(properties('PatchPreferencesView'));
-    expect(sections).toEqual(properties('UserPreferences'));
+    // `onboarding_completed` belongs to the welcome tour of the dashboard, not to a settings tab.
+    const settingsOnly = (name: string) => properties(name).filter((field) => field !== 'onboarding_completed');
+    expect(sections).toEqual(settingsOnly('PatchPreferencesView'));
+    expect(sections).toEqual(settingsOnly('UserPreferences'));
   });
 
   test('notifications are exactly the Core notification settings, editable and stored', () => {

@@ -7,6 +7,7 @@ import { logger } from './logger';
 import healthRouter from './routes/health';
 import checkApis from './routes/check_apis';
 import moduleRouter from './routes/settings';
+import searchRouter from './routes/search';
 
 export const app = express();
 // Client IP (req.ip) seen behind the ingress: see parseTrustProxy (TRUST_PROXY unset = no proxy trusted).
@@ -25,6 +26,8 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiDocument));
 app.get(['/openapi.json', '/swagger.json'], (_req, res) => res.json(openApiDocument));
 app.use('/health', healthRouter);
 app.use('/check_apis', checkApis);
+// The header's global search, over every business API (noStore + requireSession in the router).
+app.use('/search', searchRouter);
 // Session-bound answers must never be cached by a proxy or the browser.
 app.use('/settings', noStore, moduleRouter);
 // Unknown routes and every error end in the shared envelope `{ error: { code, message, details } }`:

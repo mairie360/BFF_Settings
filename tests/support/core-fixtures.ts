@@ -28,6 +28,7 @@ export function meResponse(overrides: Partial<GetMeResponseView> = {}): GetMeRes
     roles: ['User'],
     status: 'active',
     groups: [group(1, { name: 'Service urbanisme' })],
+    modules: ['dashboard', 'settings'],
     ...overrides,
   };
 }
